@@ -27,8 +27,12 @@ type JobDetail struct {
 	Description    string
 	Seniority      string
 	EmploymentType string
+	WorkType       string
 	JobFunction    string
 	Industries     string
+	SalaryMin      float64
+	SalaryMax      float64
+	SalaryText     string
 }
 
 func ParseJobs(html string) ([]Job, error) {
@@ -82,6 +86,10 @@ func ParseJobDetail(html string) (JobDetail, error) {
 			detail.JobFunction = value
 		case "Industries":
 			detail.Industries = value
+		case "Remote allowed", "Work type", "Work arrangement":
+			detail.WorkType = value
+		case "Base pay range", "Salary range", "Compensation":
+			detail.SalaryText = value
 		}
 	})
 
