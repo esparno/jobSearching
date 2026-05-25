@@ -24,3 +24,6 @@ vendor/
 .idea/
 .vscode/
 *.iml
+
+# Claude
+.claude/
