@@ -95,7 +95,7 @@ func parsePayFromText(text string) (payText string, payMin, payMax *float64, pay
 		return
 	}
 
-	payText = text[loc[0]:loc[1]]
+	payText = strings.TrimSpace(text[loc[0]:loc[1]])
 	groups := payRangeRe.FindStringSubmatch(text)
 
 	minVal := parseAmount(groups[1], groups[2])
