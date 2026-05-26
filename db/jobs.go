@@ -2,14 +2,14 @@ package db
 
 import (
 	"context"
+	"jobSearching/models"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"jobSearching/api"
 )
 
 // UpsertJob inserts a job or updates last_seen if it already exists.
 // Returns the internal job ID.
-func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job api.Job) (int64, error) {
+func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, error) {
 	var id int64
 	err := pool.QueryRow(ctx, `
 		INSERT INTO jobs (source, source_id, title, company, location, url, posted_date)
@@ -31,7 +31,7 @@ func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job api.Job) (int64, err
 
 // InsertJobDetail saves the full detail for a job.
 // Does nothing if details already exist for this job.
-func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job api.Job, detail api.JobDetail) error {
+func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job models.Job, detail models.JobDetail) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO job_details (
 			job_id, source, source_id, seniority, employment_type, work_type,

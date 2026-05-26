@@ -1,52 +1,26 @@
-package api
+package linkedin
 
 import (
 	"strings"
 
+	"jobSearching/models"
+
 	"github.com/PuerkitoBio/goquery"
 )
 
-type Job struct {
-	Source     string
-	SourceID   string
-	Title      string
-	Company    string
-	Location   string
-	URL        string
-	PostedDate string // YYYY-MM-DD from LinkedIn's datetime attribute
-}
-
-type JobDetail struct {
-	SourceID       string
-	Title          string
-	Company        string
-	Location       string
-	PostedAgo      string
-	Applicants     string
-	Description    string
-	Seniority      string
-	EmploymentType string
-	WorkType       string
-	JobFunction    string
-	Industries     string
-	SalaryMin      *float64
-	SalaryMax      *float64
-	SalaryText     string
-}
-
-func ParseJobs(html string, source string) ([]Job, error) {
+func ParseJobs(html string, source string) ([]models.Job, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil, err
 	}
 
-	var jobs []Job
+	var jobs []models.Job
 	doc.Find("div.job-search-card").Each(func(_ int, s *goquery.Selection) {
 		urn := s.AttrOr("data-entity-urn", "")
 		parts := strings.Split(urn, ":")
 		sourceID := parts[len(parts)-1]
 
-		job := Job{
+		job := models.Job{
 			Source:     source,
 			SourceID:   sourceID,
 			Title:      strings.TrimSpace(s.Find("h3.base-search-card__title").Text()),
@@ -61,13 +35,13 @@ func ParseJobs(html string, source string) ([]Job, error) {
 	return jobs, nil
 }
 
-func ParseJobDetail(html string) (JobDetail, error) {
+func ParseJobDetail(html string) (models.JobDetail, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
-		return JobDetail{}, err
+		return models.JobDetail{}, err
 	}
 
-	detail := JobDetail{
+	detail := models.JobDetail{
 		SourceID:    strings.TrimSpace(doc.Find("code#decoratedJobPostingId").Text()),
 		Title:       strings.TrimSpace(doc.Find("h2.top-card-layout__title").Text()),
 		Company:     strings.TrimSpace(doc.Find("a.topcard__org-name-link").Text()),
