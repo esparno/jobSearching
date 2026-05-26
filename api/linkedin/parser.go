@@ -1,11 +1,21 @@
 package linkedin
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 
 	"jobSearching/models"
 
 	"github.com/PuerkitoBio/goquery"
+)
+
+var (
+	payRangeRe = regexp.MustCompile(
+		`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?\s*(?:–|—|-|to\b|and\b)\s*\$?([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`,
+	)
+	hourlyRe = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly\b`)
+	annualRe = regexp.MustCompile(`(?i)/yr\b|/year\b|per\s+year\b|\bannually\b`)
 )
 
 func ParseJobs(html string, source string) ([]models.Job, error) {
@@ -66,9 +76,61 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 		case "Industries":
 			detail.Industries = value
 		case "Base pay range", "Salary range", "Compensation":
-			detail.SalaryText = value
+			detail.PayText = value
 		}
 	})
 
+	if detail.PayText != "" {
+		_, detail.PayMin, detail.PayMax, detail.PayType = parsePayFromText(detail.PayText)
+	} else {
+		detail.PayText, detail.PayMin, detail.PayMax, detail.PayType = parsePayFromText(detail.Description)
+	}
+
 	return detail, nil
+}
+
+func parsePayFromText(text string) (payText string, payMin, payMax *float64, payType models.PayType) {
+	loc := payRangeRe.FindStringIndex(text)
+	if loc == nil {
+		return
+	}
+
+	payText = text[loc[0]:loc[1]]
+	groups := payRangeRe.FindStringSubmatch(text)
+
+	minVal := parseAmount(groups[1], groups[2])
+	maxVal := parseAmount(groups[3], groups[4])
+
+	// Handle "$65-85K" where K applies to both (e.g. shorthand for $65K-$85K)
+	if strings.EqualFold(groups[4], "k") && !strings.EqualFold(groups[2], "k") && minVal < 1000 {
+		minVal *= 1000
+	}
+
+	payMin = &minVal
+	payMax = &maxVal
+
+	ctxStart := max(0, loc[0]-100)
+	ctxEnd := min(len(text), loc[1]+100)
+	context := text[ctxStart:ctxEnd]
+
+	switch {
+	case hourlyRe.MatchString(context):
+		payType = models.PayTypeHourly
+	case annualRe.MatchString(context):
+		payType = models.PayTypeSalary
+	case minVal < 500:
+		payType = models.PayTypeHourly
+	default:
+		payType = models.PayTypeSalary
+	}
+
+	return
+}
+
+func parseAmount(digits, k string) float64 {
+	val, _ := strconv.ParseFloat(strings.ReplaceAll(digits, ",", ""), 64)
+	if strings.EqualFold(k, "k") {
+		val *= 1000
+	}
+	return val
 }

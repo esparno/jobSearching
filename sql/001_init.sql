@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS job_details (
     industries      TEXT,
     description     TEXT,
     applicants      TEXT,
-    salary_min      NUMERIC,
-    salary_max      NUMERIC,
-    salary_text     TEXT,
+    pay_type        TEXT,
+    pay_min         NUMERIC,
+    pay_max         NUMERIC,
+    pay_text        TEXT,
     description_tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', COALESCE(description, ''))) STORED,
     fetched_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (job_id),
@@ -55,9 +56,10 @@ COMMENT ON COLUMN job_details.job_function    IS 'Job function e.g. engineering,
 COMMENT ON COLUMN job_details.industries      IS 'Industry the company operates in';
 COMMENT ON COLUMN job_details.description     IS 'Full job description text';
 COMMENT ON COLUMN job_details.applicants      IS 'Applicant count as reported by the board e.g. 37 applicants';
-COMMENT ON COLUMN job_details.salary_min      IS 'Lower bound of the salary range if provided';
-COMMENT ON COLUMN job_details.salary_max      IS 'Upper bound of the salary range if provided';
-COMMENT ON COLUMN job_details.salary_text     IS 'Raw salary text as scraped, for reference and future parsing';
+COMMENT ON COLUMN job_details.pay_type        IS 'Pay frequency e.g. hourly, salary';
+COMMENT ON COLUMN job_details.pay_min         IS 'Lower bound of the pay range if provided';
+COMMENT ON COLUMN job_details.pay_max         IS 'Upper bound of the pay range if provided';
+COMMENT ON COLUMN job_details.pay_text        IS 'Raw pay text as scraped, for reference and future parsing';
 COMMENT ON COLUMN job_details.description_tsv  IS 'Auto-generated tsvector of description for full text search';
 COMMENT ON CONSTRAINT job_details_job_id_key ON job_details IS 'Each job can only have one detail record';
 COMMENT ON COLUMN job_details.fetched_at       IS 'Timestamp when the job details were fetched';

@@ -10,9 +10,16 @@ const (
 type WorkType string
 
 const (
-	Remote = "remote"
-	Onsite = "onsite"
-	Hybrid = "hybrid"
+	Remote WorkType = "remote"
+	Onsite WorkType = "onsite"
+	Hybrid WorkType = "hybrid"
+)
+
+type PayType string
+
+const (
+	PayTypeHourly PayType = "hourly"
+	PayTypeSalary PayType = "salary"
 )
 
 type Job struct {
@@ -51,7 +58,8 @@ type JobDetail struct {
 	WorkType       string
 	JobFunction    string
 	Industries     string
-	SalaryMin      *float64
-	SalaryMax      *float64
-	SalaryText     string
+	PayType        PayType
+	PayMin         *float64
+	PayMax         *float64
+	PayText        string
 }
