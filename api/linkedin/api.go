@@ -126,7 +126,7 @@ func headersToJSON(h http.Header) string {
 }
 
 const (
-	numWorkers = 3
+	numWorkers = 1
 	minDelay   = 2 * time.Second
 	maxJitter  = 3 * time.Second
 )
