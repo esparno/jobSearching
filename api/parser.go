@@ -2,23 +2,22 @@ package api
 
 import (
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 )
 
 type Job struct {
-	ID           string
-	Title        string
-	Company      string
-	Location     string
-	URL          string
-	LinkedInDate string
-	FirstSeen    time.Time
+	Source     string
+	SourceID   string
+	Title      string
+	Company    string
+	Location   string
+	URL        string
+	PostedDate string // YYYY-MM-DD from LinkedIn's datetime attribute
 }
 
 type JobDetail struct {
-	ID             string
+	SourceID       string
 	Title          string
 	Company        string
 	Location       string
@@ -30,12 +29,12 @@ type JobDetail struct {
 	WorkType       string
 	JobFunction    string
 	Industries     string
-	SalaryMin      float64
-	SalaryMax      float64
+	SalaryMin      *float64
+	SalaryMax      *float64
 	SalaryText     string
 }
 
-func ParseJobs(html string) ([]Job, error) {
+func ParseJobs(html string, source string) ([]Job, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return nil, err
@@ -43,14 +42,18 @@ func ParseJobs(html string) ([]Job, error) {
 
 	var jobs []Job
 	doc.Find("div.job-search-card").Each(func(_ int, s *goquery.Selection) {
+		urn := s.AttrOr("data-entity-urn", "")
+		parts := strings.Split(urn, ":")
+		sourceID := parts[len(parts)-1]
+
 		job := Job{
-			ID:           s.AttrOr("data-entity-urn", ""),
-			Title:        strings.TrimSpace(s.Find("h3.base-search-card__title").Text()),
-			Company:      strings.TrimSpace(s.Find("h4.base-search-card__subtitle a").Text()),
-			Location:     strings.TrimSpace(s.Find("span.job-search-card__location").Text()),
-			URL:          s.Find("a.base-card__full-link").AttrOr("href", ""),
-			LinkedInDate: s.Find("time").AttrOr("datetime", ""),
-			FirstSeen:    time.Now(),
+			Source:     source,
+			SourceID:   sourceID,
+			Title:      strings.TrimSpace(s.Find("h3.base-search-card__title").Text()),
+			Company:    strings.TrimSpace(s.Find("h4.base-search-card__subtitle a").Text()),
+			Location:   strings.TrimSpace(s.Find("span.job-search-card__location").Text()),
+			URL:        s.Find("a.base-card__full-link").AttrOr("href", ""),
+			PostedDate: s.Find("time").AttrOr("datetime", ""),
 		}
 		jobs = append(jobs, job)
 	})
@@ -65,7 +68,7 @@ func ParseJobDetail(html string) (JobDetail, error) {
 	}
 
 	detail := JobDetail{
-		ID:          strings.TrimSpace(doc.Find("code#decoratedJobPostingId").Text()),
+		SourceID:    strings.TrimSpace(doc.Find("code#decoratedJobPostingId").Text()),
 		Title:       strings.TrimSpace(doc.Find("h2.top-card-layout__title").Text()),
 		Company:     strings.TrimSpace(doc.Find("a.topcard__org-name-link").Text()),
 		Location:    strings.TrimSpace(doc.Find("span.topcard__flavor--bullet").First().Text()),
@@ -79,15 +82,15 @@ func ParseJobDetail(html string) (JobDetail, error) {
 		value := strings.TrimSpace(s.Find("span.description__job-criteria-text").Text())
 		switch header {
 		case "Seniority level":
-			detail.Seniority = value
+			if value != "Not Applicable" {
+				detail.Seniority = value
+			}
 		case "Employment type":
 			detail.EmploymentType = value
 		case "Job function":
 			detail.JobFunction = value
 		case "Industries":
 			detail.Industries = value
-		case "Remote allowed", "Work type", "Work arrangement":
-			detail.WorkType = value
 		case "Base pay range", "Salary range", "Compensation":
 			detail.SalaryText = value
 		}

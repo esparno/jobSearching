@@ -58,16 +58,18 @@ func SearchJobs(searchTerm Keywords, timePeriod timePostedLookup, searchOptions 
 
 	searchUrl := "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 	location := "United+States"
+	geoId := "103644278"
 
 	params := url.Values{}
 	params.Set("keywords", string(searchTerm))
 	params.Set("location", location)
+	params.Set("geoId", geoId)
 	params.Set("f_TPR", string(timePeriod))
 	searchOptions.AddSearchParams(params)
 
-	fmt.Println(params.Encode())
-
 	getUrl := searchUrl + "?" + params.Encode()
+
+	fmt.Println(getUrl)
 	return http.Get(getUrl)
 }
 
