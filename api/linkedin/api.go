@@ -207,6 +207,8 @@ func ScrapeJobs(numberOfJobs int, opts SearchOptions, ctx context.Context, pool 
 					continue
 				}
 
+				detail.WorkType = string(opts.WorkType)
+
 				if err := db.InsertJobDetail(ctx, pool, jobID, job, detail); err != nil {
 					log.Printf("failed to insert detail for job %s: %v", job.SourceID, err)
 					continue
