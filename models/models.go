@@ -1,5 +1,18 @@
 package models
 
+const (
+	LinkedIn = "linkedin"
+	Indeed   = "indeed"
+)
+
+type WorkType string
+
+const (
+	Remote = "remote"
+	Onsite = "onsite"
+	Hybrid = "hybrid"
+)
+
 type Job struct {
 	Source     string
 	SourceID   string

@@ -4,6 +4,7 @@ import (
 	"context"
 	"jobSearching/api/linkedin"
 	"jobSearching/db"
+	"jobSearching/models"
 	"log"
 
 	"github.com/joho/godotenv"
@@ -22,5 +23,9 @@ func main() {
 	}
 	defer pool.Close()
 
-	linkedin.ScrapeJobs(100, 0, ctx, pool)
+	linkedin.ScrapeJobs(100, linkedin.SearchOptions{
+		Keywords:   linkedin.KeywordsSoftwareEngineer,
+		TimePosted: linkedin.OneDay,
+		WorkType:   models.Remote,
+	}, ctx, pool)
 }
