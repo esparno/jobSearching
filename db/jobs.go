@@ -8,14 +8,15 @@ import (
 )
 
 // UpsertJob inserts a job or updates last_seen if it already exists.
-// Returns the internal job ID.
-func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, error) {
+// Returns the internal job ID and whether the job was newly inserted.
+func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, bool, error) {
 	var id int64
+	var isNew bool
 	err := pool.QueryRow(ctx, `
 		INSERT INTO jobs (source, source_id, title, company, location, url, posted_date)
 		VALUES ($1, $2, $3, $4, $5, $6, $7::date)
 		ON CONFLICT (source, source_id) DO UPDATE SET last_seen = NOW()
-		RETURNING id
+		RETURNING id, (xmax = 0) AS is_new
 	`,
 		job.Source,
 		job.SourceID,
@@ -24,9 +25,9 @@ func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, 
 		nullableString(job.Location),
 		nullableString(job.URL),
 		nullableString(job.PostedDate),
-	).Scan(&id)
+	).Scan(&id, &isNew)
 
-	return id, err
+	return id, isNew, err
 }
 
 // InsertJobDetail saves the full detail for a job.
