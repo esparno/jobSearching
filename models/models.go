@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 const (
 	LinkedIn = "linkedin"
 	Indeed   = "indeed"
@@ -21,6 +23,19 @@ type Job struct {
 	Location   string
 	URL        string
 	PostedDate string // YYYY-MM-DD
+}
+
+type ScrapeRun struct {
+	Source      string
+	Keywords    string
+	TimePosted  string
+	WorkType    string
+	JobType     string
+	StartedAt   time.Time
+	FinishedAt  time.Time
+	JobsFound   int64
+	JobsNew     int64
+	JobsSkipped int64
 }
 
 type JobDetail struct {

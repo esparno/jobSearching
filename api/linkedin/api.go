@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -119,7 +120,10 @@ func randomDelay() {
 }
 
 func ScrapeJobs(numberOfJobs int, opts SearchOptions, ctx context.Context, pool *pgxpool.Pool) {
+	startedAt := time.Now()
 	jobsCh := make(chan models.Job, (numberOfJobs-opts.Start)/10)
+
+	var found atomic.Int64
 
 	// Paginator — fetches pages and sends jobs into the channel
 	go func() {
@@ -146,6 +150,12 @@ func ScrapeJobs(numberOfJobs int, opts SearchOptions, ctx context.Context, pool 
 				continue
 			}
 
+			if len(jobs) == 0 {
+				log.Printf("no jobs returned at start=%d, stopping early", i)
+				break
+			}
+
+			found.Add(int64(len(jobs)))
 			fmt.Printf("page start=%d: found %d jobs\n", i, len(jobs))
 			for _, job := range jobs {
 				jobsCh <- job
@@ -156,15 +166,25 @@ func ScrapeJobs(numberOfJobs int, opts SearchOptions, ctx context.Context, pool 
 	}()
 
 	// Worker pool — each worker fetches details and saves to DB
-	var wg sync.WaitGroup
+	var (
+		wg      sync.WaitGroup
+		saved   atomic.Int64
+		skipped atomic.Int64
+	)
 	for range numWorkers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for job := range jobsCh {
-				jobID, err := db.UpsertJob(ctx, pool, job)
+				jobID, isNew, err := db.UpsertJob(ctx, pool, job)
 				if err != nil {
 					log.Printf("failed to upsert job %s: %v", job.SourceID, err)
+					continue
+				}
+
+				if !isNew {
+					skipped.Add(1)
+					fmt.Printf("skipped: %s | %s | %s\n", job.SourceID, job.Title, job.Company)
 					continue
 				}
 
@@ -192,6 +212,7 @@ func ScrapeJobs(numberOfJobs int, opts SearchOptions, ctx context.Context, pool 
 					continue
 				}
 
+				saved.Add(1)
 				fmt.Printf("saved: %s | %s | %s\n", job.SourceID, job.Title, job.Company)
 				randomDelay()
 			}
@@ -199,4 +220,23 @@ func ScrapeJobs(numberOfJobs int, opts SearchOptions, ctx context.Context, pool 
 	}
 
 	wg.Wait()
+
+	run := models.ScrapeRun{
+		Source:      models.LinkedIn,
+		Keywords:    string(opts.Keywords),
+		TimePosted:  string(opts.TimePosted),
+		WorkType:    string(opts.WorkType),
+		JobType:     string(opts.JobType),
+		StartedAt:   startedAt,
+		FinishedAt:  time.Now(),
+		JobsFound:   found.Load(),
+		JobsNew:     saved.Load(),
+		JobsSkipped: skipped.Load(),
+	}
+
+	if err := db.InsertScrapeRun(ctx, pool, run); err != nil {
+		log.Printf("failed to log scrape run: %v", err)
+	}
+
+	log.Printf("scrape complete: %d found, %d new, %d skipped", run.JobsFound, run.JobsNew, run.JobsSkipped)
 }
