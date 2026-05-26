@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -109,6 +110,21 @@ func SearchJobId(jobId string) (*http.Response, error) {
 	return http.Get(postingUrl)
 }
 
+func headersToJSON(h http.Header) string {
+	b := strings.Builder{}
+	b.WriteString("{")
+	first := true
+	for k, vals := range h {
+		if !first {
+			b.WriteString(",")
+		}
+		fmt.Fprintf(&b, "%q:%q", k, strings.Join(vals, ", "))
+		first = false
+	}
+	b.WriteString("}")
+	return b.String()
+}
+
 const (
 	numWorkers = 3
 	minDelay   = 2 * time.Second
@@ -188,26 +204,101 @@ func ScrapeJobs(numberOfJobs int, opts SearchOptions, ctx context.Context, pool 
 					continue
 				}
 
+				detailURL := "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/" + job.SourceID
 				detailResp, err := SearchJobId(job.SourceID)
 				if err != nil {
 					log.Printf("failed to fetch detail for job %s: %v", job.SourceID, err)
+					db.InsertRequestLog(ctx, pool, models.RequestLog{
+						Source:         models.LinkedIn,
+						JobSourceID:    job.SourceID,
+						URL:            detailURL,
+						RequestHeaders: "{}",
+						Error:          err.Error(),
+						Message:        "network error fetching job detail",
+						IsIssue:        true,
+					})
 					continue
 				}
+
+				statusCode := detailResp.StatusCode
+				reqHeaders := headersToJSON(detailResp.Request.Header)
 
 				detailBody, err := io.ReadAll(detailResp.Body)
 				detailResp.Body.Close()
 				if err != nil {
 					log.Printf("failed to read detail body for job %s: %v", job.SourceID, err)
+					db.InsertRequestLog(ctx, pool, models.RequestLog{
+						Source:         models.LinkedIn,
+						JobSourceID:    job.SourceID,
+						URL:            detailURL,
+						RequestHeaders: reqHeaders,
+						StatusCode:     &statusCode,
+						Error:          err.Error(),
+						Message:        "failed to read response body",
+						IsIssue:        true,
+					})
 					continue
 				}
 
-				detail, err := ParseJobDetail(string(detailBody))
+				bodyStr := string(detailBody)
+
+				if statusCode != http.StatusOK {
+					log.Printf("unexpected status %d for job %s", statusCode, job.SourceID)
+					db.InsertRequestLog(ctx, pool, models.RequestLog{
+						Source:         models.LinkedIn,
+						JobSourceID:    job.SourceID,
+						URL:            detailURL,
+						RequestHeaders: reqHeaders,
+						StatusCode:     &statusCode,
+						Message:        fmt.Sprintf("non-200 status code: %d", statusCode),
+						ResponseBody:   bodyStr,
+						IsIssue:        true,
+					})
+					continue
+				}
+
+				detail, err := ParseJobDetail(bodyStr)
 				if err != nil {
 					log.Printf("failed to parse detail for job %s: %v", job.SourceID, err)
+					db.InsertRequestLog(ctx, pool, models.RequestLog{
+						Source:         models.LinkedIn,
+						JobSourceID:    job.SourceID,
+						URL:            detailURL,
+						RequestHeaders: reqHeaders,
+						StatusCode:     &statusCode,
+						Error:          err.Error(),
+						Message:        "failed to parse job detail HTML",
+						ResponseBody:   bodyStr,
+						IsIssue:        true,
+					})
 					continue
 				}
 
 				detail.WorkType = string(opts.WorkType)
+
+				if detail.Description == "" {
+					log.Printf("empty description for job %s", job.SourceID)
+					db.InsertRequestLog(ctx, pool, models.RequestLog{
+						Source:         models.LinkedIn,
+						JobSourceID:    job.SourceID,
+						URL:            detailURL,
+						RequestHeaders: reqHeaders,
+						StatusCode:     &statusCode,
+						Message:        "parse succeeded but description was empty",
+						ResponseBody:   bodyStr,
+						IsIssue:        true,
+					})
+				} else {
+					db.InsertRequestLog(ctx, pool, models.RequestLog{
+						Source:         models.LinkedIn,
+						JobSourceID:    job.SourceID,
+						URL:            detailURL,
+						RequestHeaders: reqHeaders,
+						StatusCode:     &statusCode,
+						Message:        "ok",
+						IsIssue:        false,
+					})
+				}
 
 				if err := db.InsertJobDetail(ctx, pool, jobID, job, detail); err != nil {
 					log.Printf("failed to insert detail for job %s: %v", job.SourceID, err)

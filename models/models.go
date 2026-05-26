@@ -45,6 +45,18 @@ type ScrapeRun struct {
 	JobsSkipped int64
 }
 
+type RequestLog struct {
+	Source         string
+	JobSourceID    string
+	URL            string
+	RequestHeaders string
+	StatusCode     *int
+	Error          string
+	Message        string
+	ResponseBody   string
+	IsIssue        bool
+}
+
 type JobDetail struct {
 	SourceID       string
 	Title          string
