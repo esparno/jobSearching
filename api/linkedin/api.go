@@ -19,6 +19,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var httpClient = &http.Client{}
+
 type Keywords string
 
 const (
@@ -89,7 +91,7 @@ func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
 
 	getUrl := searchUrl + "?" + params.Encode()
 	fmt.Println(getUrl)
-	return http.Get(getUrl)
+	return httpClient.Get(getUrl)
 }
 
 func (searchOptions SearchOptions) Validate() error {
@@ -107,7 +109,7 @@ func (searchOptions SearchOptions) Validate() error {
 
 func SearchJobId(jobId string) (*http.Response, error) {
 	postingUrl := "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/" + jobId
-	return http.Get(postingUrl)
+	return httpClient.Get(postingUrl)
 }
 
 func headersToJSON(h http.Header) string {
