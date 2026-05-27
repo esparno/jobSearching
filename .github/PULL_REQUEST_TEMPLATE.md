@@ -1,4 +1,4 @@
-are Closes #<!-- issue number -->
+Closes #<!-- issue number -->
 
 ## Problem
 <!-- What was wrong or missing? -->
