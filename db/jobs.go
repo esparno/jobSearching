@@ -7,8 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// UpsertJob inserts a job or updates last_seen if it already exists.
-// Returns the internal job ID and whether the job was newly inserted.
+// UpsertJob inserts a job listing or bumps last_seen if it already exists.
+// Returns the internal job ID, whether the row was newly inserted, and any error.
 func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, bool, error) {
 	var id int64
 	var isNew bool
@@ -30,8 +30,8 @@ func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, 
 	return id, isNew, err
 }
 
-// InsertJobDetail saves the full detail for a job.
-// Does nothing if details already exist for this job.
+// InsertJobDetail saves the full detail page data for a job identified by jobID.
+// Does nothing if a detail row already exists for that job (ON CONFLICT DO NOTHING).
 func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job models.Job, detail models.JobDetail) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO job_details (
@@ -62,7 +62,7 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job m
 	return err
 }
 
-// nullableString returns nil for empty strings so they are stored as NULL.
+// nullableString returns nil for empty strings so that optional fields are stored as SQL NULL.
 func nullableString(s string) *string {
 	if s == "" {
 		return nil

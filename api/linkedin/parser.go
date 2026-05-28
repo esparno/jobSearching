@@ -20,6 +20,7 @@ var (
 	applicantsLessThanRe    = regexp.MustCompile(`(?i)\b(less than|under|among the first|fewer than)\b`)
 )
 
+// ParseJobs extracts job listing summaries from a LinkedIn search results HTML page.
 func ParseJobs(html string, source string) ([]models.Job, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -47,6 +48,7 @@ func ParseJobs(html string, source string) ([]models.Job, error) {
 	return jobs, nil
 }
 
+// ParseJobDetail extracts structured detail data from a LinkedIn job posting HTML page.
 func ParseJobDetail(html string) (models.JobDetail, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -94,6 +96,8 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 	return detail, nil
 }
 
+// parsePayFromText scans free-form text for a salary or hourly pay range.
+// Returns empty values when no recognisable range is found.
 func parsePayFromText(text string) (payText string, payMin, payMax *float64, payType models.PayType) {
 	loc := payRangeRe.FindStringIndex(text)
 	if loc == nil {
@@ -132,6 +136,8 @@ func parsePayFromText(text string) (payText string, payMin, payMax *float64, pay
 	return
 }
 
+// parseApplicantsText extracts the most informative applicants phrase from text.
+// Prefers a phrase containing an actual number over a vague one like "Be an early applicant".
 func parseApplicantsText(text string) string {
 	matches := applicantsTextRe.FindAllString(text, -1)
 	for _, m := range matches {
@@ -145,6 +151,8 @@ func parseApplicantsText(text string) string {
 	return ""
 }
 
+// parseApplicantsQualifier returns whether the applicant count is exact, a lower bound, or an upper bound.
+// Returns an empty string when no numeric count is present.
 func parseApplicantsQualifier(text string) models.ApplicantsQualifier {
 	if text == "" || !applicantsRe.MatchString(text) {
 		return ""
@@ -158,6 +166,8 @@ func parseApplicantsQualifier(text string) models.ApplicantsQualifier {
 	return models.ApplicantsEqual
 }
 
+// parseApplicantsCount extracts the numeric applicant count from a phrase like "142 applicants".
+// Returns nil when no number is found.
 func parseApplicantsCount(text string) *int {
 	groups := applicantsRe.FindStringSubmatch(text)
 	if groups == nil {
@@ -170,6 +180,7 @@ func parseApplicantsCount(text string) *int {
 	return &n
 }
 
+// parseAmount converts a digit string and optional "k"/"K" suffix into a numeric value.
 func parseAmount(digits, k string) float64 {
 	val, _ := strconv.ParseFloat(strings.ReplaceAll(digits, ",", ""), 64)
 	if strings.EqualFold(k, "k") {
