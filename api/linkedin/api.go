@@ -21,7 +21,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var httpClient = req.NewClient().ImpersonateChrome()
+var httpClient = req.NewClient().ImpersonateChrome().
+	SetCommonHeader("Accept-Language", "en-US,en;q=0.9")
 
 // Configure applies environment-driven settings to the HTTP client.
 // Must be called after environment variables are loaded.
