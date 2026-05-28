@@ -14,8 +14,10 @@ var (
 	payRangeRe    = regexp.MustCompile(`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?\s*(?:–|—|-|to\b|and\b)\s*\$?([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`)
 	hourlyRe      = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly\b`)
 	annualRe      = regexp.MustCompile(`(?i)/yr\b|/year\b|per\s+year\b|\bannually\b`)
-	applicantsTextRe = regexp.MustCompile(`(?i)[\w ]+applicants?`)
-	applicantsRe     = regexp.MustCompile(`(?i)(\d+)\s+applicants?`)
+	applicantsTextRe        = regexp.MustCompile(`(?i)[\w ]+applicants?`)
+	applicantsRe            = regexp.MustCompile(`(?i)(\d+)\s+applicants?`)
+	applicantsGreaterThanRe = regexp.MustCompile(`(?i)\b(over|more than|greater than)\b`)
+	applicantsLessThanRe    = regexp.MustCompile(`(?i)\b(less than|under|among the first|fewer than)\b`)
 )
 
 func ParseJobs(html string, source string) ([]models.Job, error) {
@@ -58,8 +60,9 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 		Company:        strings.TrimSpace(doc.Find("a.topcard__org-name-link").Text()),
 		Location:       strings.TrimSpace(doc.Find("span.topcard__flavor--bullet").First().Text()),
 		PostedAgo:      strings.TrimSpace(doc.Find("span.posted-time-ago__text").Text()),
-		ApplicantsText: applicantsText,
-		Applicants:     parseApplicantsCount(applicantsText),
+		ApplicantsText:      applicantsText,
+		Applicants:          parseApplicantsCount(applicantsText),
+		ApplicantsQualifier: parseApplicantsQualifier(applicantsText),
 		Description:    strings.TrimSpace(doc.Find("div.show-more-less-html__markup").Text()),
 	}
 
@@ -140,6 +143,19 @@ func parseApplicantsText(text string) string {
 		return strings.TrimSpace(matches[0])
 	}
 	return ""
+}
+
+func parseApplicantsQualifier(text string) models.ApplicantsQualifier {
+	if text == "" || !applicantsRe.MatchString(text) {
+		return ""
+	}
+	if applicantsGreaterThanRe.MatchString(text) {
+		return models.ApplicantsGreaterThan
+	}
+	if applicantsLessThanRe.MatchString(text) {
+		return models.ApplicantsLessThan
+	}
+	return models.ApplicantsEqual
 }
 
 func parseApplicantsCount(text string) *int {

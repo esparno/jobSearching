@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// --- nullableString ---
-
 func TestNullableString(t *testing.T) {
 	if got := nullableString("hello"); got == nil || *got != "hello" {
 		t.Errorf("non-empty: got %v, want %q", got, "hello")
@@ -17,8 +15,6 @@ func TestNullableString(t *testing.T) {
 		t.Errorf("empty: got %v, want nil", got)
 	}
 }
-
-// --- UpsertJob ---
 
 func TestUpsertJob_NewJob(t *testing.T) {
 	pool := connectTestDB(t)
@@ -98,8 +94,6 @@ func TestUpsertJob_UpdatesLastSeen(t *testing.T) {
 	}
 }
 
-// --- InsertJobDetail ---
-
 func TestInsertJobDetail(t *testing.T) {
 	pool := connectTestDB(t)
 	ctx := context.Background()
@@ -118,30 +112,31 @@ func TestInsertJobDetail(t *testing.T) {
 	payMin, payMax := 120000.0, 160000.0
 	applicantsCount := 53
 	detail := models.JobDetail{
-		SourceID:       sourceID,
-		Seniority:      "Mid-Senior level",
-		EmploymentType: "Full-time",
-		WorkType:       "Remote",
-		Description:    "Build great things.",
-		ApplicantsText: "53 applicants",
-		Applicants:     &applicantsCount,
-		PayType:        models.PayTypeSalary,
-		PayMin:         &payMin,
-		PayMax:         &payMax,
-		PayText:        "$120,000 - $160,000",
+		SourceID:            sourceID,
+		Seniority:           "Mid-Senior level",
+		EmploymentType:      "Full-time",
+		WorkType:            "Remote",
+		Description:         "Build great things.",
+		ApplicantsText:      "53 applicants",
+		Applicants:          &applicantsCount,
+		ApplicantsQualifier: models.ApplicantsEqual,
+		PayType:             models.PayTypeSalary,
+		PayMin:              &payMin,
+		PayMax:              &payMax,
+		PayText:             "$120,000 - $160,000",
 	}
 
 	if err := InsertJobDetail(ctx, pool, jobID, job, detail); err != nil {
 		t.Fatalf("InsertJobDetail: %v", err)
 	}
 
-	var storedDesc, storedPayText, storedApplicantsText string
+	var storedDesc, storedPayText, storedApplicantsText, storedApplicantsQualifier string
 	var storedPayMin, storedPayMax float64
 	var storedApplicants int
 	err = pool.QueryRow(ctx, `
-		SELECT description, pay_text, pay_min, pay_max, applicants_text, applicants
+		SELECT description, pay_text, pay_min, pay_max, applicants_text, applicants, applicants_qualifier
 		FROM job_details WHERE source_id = $1
-	`, sourceID).Scan(&storedDesc, &storedPayText, &storedPayMin, &storedPayMax, &storedApplicantsText, &storedApplicants)
+	`, sourceID).Scan(&storedDesc, &storedPayText, &storedPayMin, &storedPayMax, &storedApplicantsText, &storedApplicants, &storedApplicantsQualifier)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -162,6 +157,9 @@ func TestInsertJobDetail(t *testing.T) {
 	}
 	if storedApplicants != applicantsCount {
 		t.Errorf("applicants: got %d, want %d", storedApplicants, applicantsCount)
+	}
+	if storedApplicantsQualifier != string(detail.ApplicantsQualifier) {
+		t.Errorf("applicants_qualifier: got %q, want %q", storedApplicantsQualifier, detail.ApplicantsQualifier)
 	}
 }
 

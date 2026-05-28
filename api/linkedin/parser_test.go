@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// --- ParseJobs ---
-
 const jobsHTML = `
 <div class="job-search-card" data-entity-urn="urn:li:jobPosting:123456">
     <a class="base-card__full-link" href="https://linkedin.com/jobs/view/123456"></a>
@@ -63,8 +61,6 @@ func TestParseJobs_Empty(t *testing.T) {
 		t.Errorf("expected 0 jobs, got %d", len(jobs))
 	}
 }
-
-// --- ParseJobDetail ---
 
 const detailHTML = `
 <h2 class="top-card-layout__title">Backend Engineer</h2>
@@ -172,8 +168,6 @@ func TestParseJobDetail_PayFromCriteria(t *testing.T) {
 		t.Errorf("PayType: got %q, want %q", detail.PayType, models.PayTypeSalary)
 	}
 }
-
-// --- parsePayFromText ---
 
 func ptr(f float64) *float64 { return &f }
 
@@ -284,8 +278,6 @@ func TestParsePayFromText(t *testing.T) {
 	}
 }
 
-// --- parseApplicantsCount ---
-
 var applicantsTests = []struct {
 	name      string
 	input     string
@@ -332,3 +324,30 @@ func TestParseApplicantsCount(t *testing.T) {
 }
 
 func ptrInt(n int) *int { return &n }
+
+func TestParseApplicantsQualifier(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  models.ApplicantsQualifier
+	}{
+		{name: "exact", input: "142 applicants", want: models.ApplicantsEqual},
+		{name: "over", input: "Over 200 applicants", want: models.ApplicantsGreaterThan},
+		{name: "more than", input: "More than 200 applicants", want: models.ApplicantsGreaterThan},
+		{name: "less than", input: "Less than 67 applicants", want: models.ApplicantsLessThan},
+		{name: "under", input: "Under 50 applicants", want: models.ApplicantsLessThan},
+		{name: "among the first", input: "Be among the first 25 applicants", want: models.ApplicantsLessThan},
+		{name: "fewer than", input: "Fewer than 10 applicants", want: models.ApplicantsLessThan},
+		{name: "no number", input: "Be an early applicant", want: ""},
+		{name: "empty", input: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseApplicantsQualifier(tt.input)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

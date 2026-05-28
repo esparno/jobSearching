@@ -22,6 +22,14 @@ const (
 	PayTypeSalary PayType = "salary"
 )
 
+type ApplicantsQualifier string
+
+const (
+	ApplicantsEqual       ApplicantsQualifier = "="
+	ApplicantsGreaterThan ApplicantsQualifier = ">"
+	ApplicantsLessThan    ApplicantsQualifier = "<"
+)
+
 type Job struct {
 	Source     string
 	SourceID   string
@@ -63,8 +71,9 @@ type JobDetail struct {
 	Company        string
 	Location       string
 	PostedAgo      string
-	ApplicantsText string
-	Applicants     *int
+	ApplicantsText      string
+	Applicants          *int
+	ApplicantsQualifier ApplicantsQualifier
 	Description    string
 	Seniority      string
 	EmploymentType string
