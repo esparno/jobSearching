@@ -26,17 +26,18 @@ var httpClient = req.NewClient().ImpersonateChrome().
 
 // Configure applies environment-driven settings to the HTTP client.
 // Must be called after environment variables are loaded.
-func Configure() {
-	if proxyURL := os.Getenv("DECODO_PROXY_URL"); proxyURL != "" {
-		httpClient.SetProxyURL(proxyURL)
-		if u, err := url.Parse(proxyURL); err == nil {
-			log.Printf("using Decodo proxy: %s", u.Host)
-		} else {
-			log.Printf("using Decodo proxy")
-		}
-	} else {
-		log.Printf("no proxy configured, connecting directly")
+func Configure() error {
+	proxyURL := os.Getenv("DECODO_PROXY_URL")
+	if proxyURL == "" {
+		return fmt.Errorf("DECODO_PROXY_URL is not set")
 	}
+	httpClient.SetProxyURL(proxyURL)
+	if u, err := url.Parse(proxyURL); err == nil {
+		log.Printf("using Decodo proxy: %s", u.Host)
+	} else {
+		log.Printf("using Decodo proxy")
+	}
+	return nil
 }
 
 type Keywords string

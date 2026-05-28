@@ -15,7 +15,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	linkedin.Configure()
+	if err := linkedin.Configure(); err != nil {
+		log.Fatal(err)
+	}
 
 	ctx := context.Background()
 
