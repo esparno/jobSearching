@@ -2,6 +2,7 @@ package linkedin
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/imroc/req/v3"
@@ -54,6 +55,29 @@ func TestAcceptLanguageHeader(t *testing.T) {
 func TestNoCookieJar(t *testing.T) {
 	if _, err := httpClient.GetCookies("https://www.linkedin.com"); err == nil {
 		t.Error("expected GetCookies to fail when cookie jar is disabled")
+	}
+}
+
+func TestShuffleHeaderOrder(t *testing.T) {
+	pool := []string{
+		"user-agent", "accept", "accept-language",
+		"accept-encoding", "cache-control", "pragma",
+	}
+
+	seen := make(map[string]struct{})
+	capture := req.HttpRoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		seen[strings.Join(r.Header[req.HeaderOderKey], ",")] = struct{}{}
+		return mockResponse(200, ""), nil
+	})
+
+	fn := shuffleHeaderOrder(capture)
+	for range 50 {
+		r := &http.Request{Header: http.Header{req.HeaderOderKey: append([]string(nil), pool...)}}
+		_, _ = fn(r)
+	}
+
+	if len(seen) < 2 {
+		t.Errorf("expected multiple distinct header orders across 50 calls, got %d", len(seen))
 	}
 }
 
