@@ -141,13 +141,26 @@ func headersToJSON(h http.Header) string {
 }
 
 const (
-	numWorkers = 1
-	minDelay   = 2 * time.Second
-	maxJitter  = 3 * time.Second
+	numWorkers      = 1
+	minDelay        = 3 * time.Second
+	maxJitter       = 7 * time.Second
+	macroBreakEvery = 200
+	macroBreakMin   = time.Minute
+	macroBreakMax   = 2 * time.Minute
 )
 
+var requestCount atomic.Int64
+
 // randomDelay sleeps for minDelay plus a random jitter to avoid rate limiting.
+// Every macroBreakEvery calls it pauses for a longer macro-break instead.
 func randomDelay() {
+	n := requestCount.Add(1)
+	if n%macroBreakEvery == 0 {
+		pause := macroBreakMin + time.Duration(rand.Int63n(int64(macroBreakMax-macroBreakMin)))
+		log.Printf("macro-break: pausing %s after %d requests", pause.Round(time.Second), n)
+		time.Sleep(pause)
+		return
+	}
 	time.Sleep(minDelay + time.Duration(rand.Int63n(int64(maxJitter))))
 }
 
