@@ -22,7 +22,8 @@ import (
 )
 
 var httpClient = req.NewClient().ImpersonateChrome().
-	SetCommonHeader("Accept-Language", "en-US,en;q=0.9")
+	SetCommonHeader("Accept-Language", "en-US,en;q=0.9").
+	SetCookieJar(nil)
 
 // Configure applies environment-driven settings to the HTTP client.
 // Must be called after environment variables are loaded.
