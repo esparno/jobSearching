@@ -11,9 +11,13 @@ import (
 )
 
 var (
-	payRangeRe    = regexp.MustCompile(`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?\s*(?:–|—|-|to\b|and\b)\s*\$?([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`)
-	hourlyRe      = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly\b`)
-	annualRe      = regexp.MustCompile(`(?i)/yr\b|/year\b|per\s+year\b|\bannually\b`)
+	payRangeRe          = regexp.MustCompile(`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?\s*(?:–|—|-|to\b|and\b)\s*\$?([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`)
+	singlePayRe         = regexp.MustCompile(`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`)
+	hourlyRe              = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly`)
+	weeklyRe              = regexp.MustCompile(`(?i)/wk\b|/week\b|per\s+week\b|\bweekly`)
+	monthlyRe             = regexp.MustCompile(`(?i)/mo\b|/month\b|per\s+month\b|\bmonthly`)
+	annualRe              = regexp.MustCompile(`(?i)/yr\b|/year\b|per\s+year\b|\bannually`)
+	nonAnnualPayKeywordRe = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly|/wk\b|/week\b|per\s+week\b|\bweekly|/mo\b|/month\b|per\s+month\b|\bmonthly`)
 	applicantsTextRe        = regexp.MustCompile(`(?i)[\w ]+applicants?`)
 	applicantsRe            = regexp.MustCompile(`(?i)(\d+)\s+applicants?`)
 	applicantsGreaterThanRe = regexp.MustCompile(`(?i)\b(over|more than|greater than)\b`)
@@ -96,44 +100,73 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 	return detail, nil
 }
 
-// parsePayFromText scans free-form text for a salary or hourly pay range.
-// Returns empty values when no recognisable range is found.
+// parsePayFromText scans free-form text for a pay range or single pay value.
+// Returns empty values when no recognisable pay is found.
 func parsePayFromText(text string) (payText string, payMin, payMax *float64, payType models.PayType) {
 	loc := payRangeRe.FindStringIndex(text)
-	if loc == nil {
+	if loc != nil {
+		payText = strings.TrimSpace(text[loc[0]:loc[1]])
+		groups := payRangeRe.FindStringSubmatch(text)
+
+		minVal := parseAmount(groups[1], groups[2])
+		maxVal := parseAmount(groups[3], groups[4])
+
+		// Handle "$65-85K" where K applies to both (e.g. shorthand for $65K-$85K)
+		if strings.EqualFold(groups[4], "k") && !strings.EqualFold(groups[2], "k") && minVal < 1000 {
+			minVal *= 1000
+		}
+
+		payMin = &minVal
+		payMax = &maxVal
+
+		ctxStart := max(0, loc[0]-100)
+		ctxEnd := min(len(text), loc[1]+100)
+		payType = detectPayType(text[ctxStart:ctxEnd], minVal)
 		return
 	}
 
-	payText = strings.TrimSpace(text[loc[0]:loc[1]])
-	groups := payRangeRe.FindStringSubmatch(text)
+	// Try single value. Require an explicit non-annual pay keyword nearby to
+	// avoid misclassifying benefit dollar amounts like "up to $10,000 per year".
+	for _, m := range singlePayRe.FindAllStringSubmatchIndex(text, -1) {
+		matchStart, matchEnd := m[0], m[1]
+		ctxStart := max(0, matchStart-100)
+		ctxEnd := min(len(text), matchEnd+100)
+		context := text[ctxStart:ctxEnd]
 
-	minVal := parseAmount(groups[1], groups[2])
-	maxVal := parseAmount(groups[3], groups[4])
+		if !nonAnnualPayKeywordRe.MatchString(context) {
+			continue
+		}
 
-	// Handle "$65-85K" where K applies to both (e.g. shorthand for $65K-$85K)
-	if strings.EqualFold(groups[4], "k") && !strings.EqualFold(groups[2], "k") && minVal < 1000 {
-		minVal *= 1000
-	}
-
-	payMin = &minVal
-	payMax = &maxVal
-
-	ctxStart := max(0, loc[0]-100)
-	ctxEnd := min(len(text), loc[1]+100)
-	context := text[ctxStart:ctxEnd]
-
-	switch {
-	case hourlyRe.MatchString(context):
-		payType = models.PayTypeHourly
-	case annualRe.MatchString(context):
-		payType = models.PayTypeSalary
-	case minVal < 500:
-		payType = models.PayTypeHourly
-	default:
-		payType = models.PayTypeSalary
+		k := ""
+		if m[4] >= 0 {
+			k = text[m[4]:m[5]]
+		}
+		val := parseAmount(text[m[2]:m[3]], k)
+		payText = strings.TrimSpace(text[matchStart:matchEnd])
+		payMin = &val
+		payType = detectPayType(context, val)
+		return
 	}
 
 	return
+}
+
+// detectPayType infers pay frequency from surrounding text, falling back to magnitude.
+func detectPayType(context string, val float64) models.PayType {
+	switch {
+	case hourlyRe.MatchString(context):
+		return models.PayTypeHourly
+	case weeklyRe.MatchString(context):
+		return models.PayTypeWeekly
+	case monthlyRe.MatchString(context):
+		return models.PayTypeMonthly
+	case annualRe.MatchString(context):
+		return models.PayTypeSalary
+	case val < 500:
+		return models.PayTypeHourly
+	default:
+		return models.PayTypeSalary
+	}
 }
 
 // parseApplicantsText extracts the most informative applicants phrase from text.
