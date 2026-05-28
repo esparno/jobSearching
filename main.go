@@ -15,6 +15,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	linkedin.Configure()
+
 	ctx := context.Background()
 
 	pool, err := db.Connect(ctx)
