@@ -21,8 +21,30 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var httpClient = req.NewClient().ImpersonateChrome().
-	SetCommonHeader("Accept-Language", "en-US,en;q=0.9")
+var httpClient = func() *req.Client {
+	c := req.NewClient()
+	// Register shuffle before ImpersonateChrome so it sits innermost in the transport
+	// chain — it runs after SetCommonHeaderOrder injects Chrome's fixed order, letting
+	// us randomise it before the request is actually sent.
+	c.GetTransport().WrapRoundTripFunc(shuffleHeaderOrder)
+	c.ImpersonateChrome().
+		SetCommonHeader("Accept-Language", "en-US,en;q=0.9").
+		SetCookieJar(nil)
+	return c
+}()
+
+// shuffleHeaderOrder randomises the header send-order on every request.
+func shuffleHeaderOrder(rt http.RoundTripper) req.HttpRoundTripFunc {
+	return func(r *http.Request) (*http.Response, error) {
+		if order := r.Header[req.HeaderOderKey]; len(order) > 0 {
+			shuffled := make([]string, len(order))
+			copy(shuffled, order)
+			rand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+			r.Header[req.HeaderOderKey] = shuffled
+		}
+		return rt.RoundTrip(r)
+	}
+}
 
 // Configure applies environment-driven settings to the HTTP client.
 // Must be called after environment variables are loaded.
