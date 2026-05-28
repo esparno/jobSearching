@@ -23,7 +23,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	linkedin.ScrapeJobs(ctx, 100, linkedin.SearchOptions{
+	linkedin.ScrapeJobs(ctx, 10, linkedin.SearchOptions{
 		Keywords:   linkedin.KeywordsSoftwareEngineer,
 		TimePosted: linkedin.OneDay,
 		WorkType:   models.Remote,
