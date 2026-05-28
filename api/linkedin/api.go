@@ -10,16 +10,35 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/imroc/req/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var httpClient = &http.Client{}
+var httpClient = req.NewClient().ImpersonateChrome().
+	SetCommonHeader("Accept-Language", "en-US,en;q=0.9")
+
+// Configure applies environment-driven settings to the HTTP client.
+// Must be called after environment variables are loaded.
+func Configure() error {
+	proxyURL := os.Getenv("DECODO_PROXY_URL")
+	if proxyURL == "" {
+		return fmt.Errorf("DECODO_PROXY_URL is not set")
+	}
+	httpClient.SetProxyURL(proxyURL)
+	if u, err := url.Parse(proxyURL); err == nil {
+		log.Printf("using Decodo proxy: %s", u.Host)
+	} else {
+		log.Printf("using Decodo proxy")
+	}
+	return nil
+}
 
 type Keywords string
 
@@ -93,7 +112,11 @@ func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
 
 	getURL := searchURL + "?" + params.Encode()
 	log.Printf("GET %s", getURL)
-	return httpClient.Get(getURL)
+	resp, err := httpClient.R().Get(getURL)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Response, nil
 }
 
 // Validate returns an error if any required SearchOptions field is missing.
@@ -112,7 +135,11 @@ func (searchOptions SearchOptions) Validate() error {
 
 // SearchJobId fetches the detail page HTML for a single LinkedIn job posting.
 func SearchJobId(jobId string) (*http.Response, error) {
-	return httpClient.Get(jobPostingBaseURL + jobId)
+	resp, err := httpClient.R().Get(jobPostingBaseURL + jobId)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Response, nil
 }
 
 // headersToJSON serialises an http.Header map into a compact JSON object string for logging.
@@ -132,13 +159,26 @@ func headersToJSON(h http.Header) string {
 }
 
 const (
-	numWorkers = 1
-	minDelay   = 2 * time.Second
-	maxJitter  = 3 * time.Second
+	numWorkers      = 1
+	minDelay        = 3 * time.Second
+	maxJitter       = 7 * time.Second
+	macroBreakEvery = 200
+	macroBreakMin   = time.Minute
+	macroBreakMax   = 2 * time.Minute
 )
 
+var requestCount atomic.Int64
+
 // randomDelay sleeps for minDelay plus a random jitter to avoid rate limiting.
+// Every macroBreakEvery calls it pauses for a longer macro-break instead.
 func randomDelay() {
+	n := requestCount.Add(1)
+	if n%macroBreakEvery == 0 {
+		pause := macroBreakMin + time.Duration(rand.Int63n(int64(macroBreakMax-macroBreakMin)))
+		log.Printf("macro-break: pausing %s after %d requests", pause.Round(time.Second), n)
+		time.Sleep(pause)
+		return
+	}
 	time.Sleep(minDelay + time.Duration(rand.Int63n(int64(maxJitter))))
 }
 

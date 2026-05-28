@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/imroc/req/v3"
 )
 
 // roundTripFunc lets tests intercept HTTP requests without a real server.
@@ -26,7 +28,11 @@ func mockResponse(status int, body string) *http.Response {
 func swapHTTPClient(t *testing.T, fn roundTripFunc) {
 	t.Helper()
 	orig := httpClient
-	httpClient = &http.Client{Transport: fn}
+	c := req.NewClient()
+	c.GetTransport().WrapRoundTripFunc(func(_ http.RoundTripper) req.HttpRoundTripFunc {
+		return req.HttpRoundTripFunc(fn)
+	})
+	httpClient = c
 	t.Cleanup(func() { httpClient = orig })
 }
 

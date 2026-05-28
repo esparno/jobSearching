@@ -15,6 +15,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := linkedin.Configure(); err != nil {
+		log.Fatal(err)
+	}
+
 	ctx := context.Background()
 
 	pool, err := db.Connect(ctx)
@@ -23,7 +27,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	linkedin.ScrapeJobs(ctx, 100, linkedin.SearchOptions{
+	linkedin.ScrapeJobs(ctx, 10, linkedin.SearchOptions{
 		Keywords:   linkedin.KeywordsSoftwareEngineer,
 		TimePosted: linkedin.OneDay,
 		WorkType:   models.Remote,
