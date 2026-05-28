@@ -18,8 +18,10 @@ const (
 type PayType string
 
 const (
-	PayTypeHourly PayType = "hourly"
-	PayTypeSalary PayType = "salary"
+	PayTypeHourly  PayType = "hourly"
+	PayTypeWeekly  PayType = "weekly"
+	PayTypeMonthly PayType = "monthly"
+	PayTypeSalary  PayType = "salary"
 )
 
 type ApplicantsQualifier string
