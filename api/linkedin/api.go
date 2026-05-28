@@ -16,10 +16,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/imroc/req/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var httpClient = &http.Client{}
+var httpClient = req.NewClient().ImpersonateChrome()
 
 type Keywords string
 
@@ -93,7 +94,11 @@ func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
 
 	getURL := searchURL + "?" + params.Encode()
 	log.Printf("GET %s", getURL)
-	return httpClient.Get(getURL)
+	resp, err := httpClient.R().Get(getURL)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Response, nil
 }
 
 // Validate returns an error if any required SearchOptions field is missing.
@@ -112,7 +117,11 @@ func (searchOptions SearchOptions) Validate() error {
 
 // SearchJobId fetches the detail page HTML for a single LinkedIn job posting.
 func SearchJobId(jobId string) (*http.Response, error) {
-	return httpClient.Get(jobPostingBaseURL + jobId)
+	resp, err := httpClient.R().Get(jobPostingBaseURL + jobId)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Response, nil
 }
 
 // headersToJSON serialises an http.Header map into a compact JSON object string for logging.
