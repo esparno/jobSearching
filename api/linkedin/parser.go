@@ -11,13 +11,16 @@ import (
 )
 
 var (
-	payRangeRe = regexp.MustCompile(
-		`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?\s*(?:–|—|-|to\b|and\b)\s*\$?([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`,
-	)
-	hourlyRe = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly\b`)
-	annualRe = regexp.MustCompile(`(?i)/yr\b|/year\b|per\s+year\b|\bannually\b`)
+	payRangeRe    = regexp.MustCompile(`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?\s*(?:–|—|-|to\b|and\b)\s*\$?([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`)
+	hourlyRe      = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly\b`)
+	annualRe      = regexp.MustCompile(`(?i)/yr\b|/year\b|per\s+year\b|\bannually\b`)
+	applicantsTextRe        = regexp.MustCompile(`(?i)[\w ]+applicants?`)
+	applicantsRe            = regexp.MustCompile(`(?i)(\d+)\s+applicants?`)
+	applicantsGreaterThanRe = regexp.MustCompile(`(?i)\b(over|more than|greater than)\b`)
+	applicantsLessThanRe    = regexp.MustCompile(`(?i)\b(less than|under|among the first|fewer than)\b`)
 )
 
+// ParseJobs extracts job listing summaries from a LinkedIn search results HTML page.
 func ParseJobs(html string, source string) ([]models.Job, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
@@ -45,20 +48,24 @@ func ParseJobs(html string, source string) ([]models.Job, error) {
 	return jobs, nil
 }
 
+// ParseJobDetail extracts structured detail data from a LinkedIn job posting HTML page.
 func ParseJobDetail(html string) (models.JobDetail, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
 	if err != nil {
 		return models.JobDetail{}, err
 	}
 
+	applicantsText := parseApplicantsText(doc.Text())
 	detail := models.JobDetail{
-		SourceID:    strings.TrimSpace(doc.Find("code#decoratedJobPostingId").Text()),
-		Title:       strings.TrimSpace(doc.Find("h2.top-card-layout__title").Text()),
-		Company:     strings.TrimSpace(doc.Find("a.topcard__org-name-link").Text()),
-		Location:    strings.TrimSpace(doc.Find("span.topcard__flavor--bullet").First().Text()),
-		PostedAgo:   strings.TrimSpace(doc.Find("span.posted-time-ago__text").Text()),
-		Applicants:  strings.TrimSpace(doc.Find("span.num-applicants__caption").Text()),
-		Description: strings.TrimSpace(doc.Find("div.show-more-less-html__markup").Text()),
+		SourceID:       strings.TrimSpace(doc.Find("code#decoratedJobPostingId").Text()),
+		Title:          strings.TrimSpace(doc.Find("h2.top-card-layout__title").Text()),
+		Company:        strings.TrimSpace(doc.Find("a.topcard__org-name-link").Text()),
+		Location:       strings.TrimSpace(doc.Find("span.topcard__flavor--bullet").First().Text()),
+		PostedAgo:      strings.TrimSpace(doc.Find("span.posted-time-ago__text").Text()),
+		ApplicantsText:      applicantsText,
+		Applicants:          parseApplicantsCount(applicantsText),
+		ApplicantsQualifier: parseApplicantsQualifier(applicantsText),
+		Description:    strings.TrimSpace(doc.Find("div.show-more-less-html__markup").Text()),
 	}
 
 	doc.Find("li.description__job-criteria-item").Each(func(_ int, s *goquery.Selection) {
@@ -89,6 +96,8 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 	return detail, nil
 }
 
+// parsePayFromText scans free-form text for a salary or hourly pay range.
+// Returns empty values when no recognisable range is found.
 func parsePayFromText(text string) (payText string, payMin, payMax *float64, payType models.PayType) {
 	loc := payRangeRe.FindStringIndex(text)
 	if loc == nil {
@@ -127,6 +136,51 @@ func parsePayFromText(text string) (payText string, payMin, payMax *float64, pay
 	return
 }
 
+// parseApplicantsText extracts the most informative applicants phrase from text.
+// Prefers a phrase containing an actual number over a vague one like "Be an early applicant".
+func parseApplicantsText(text string) string {
+	matches := applicantsTextRe.FindAllString(text, -1)
+	for _, m := range matches {
+		if applicantsRe.MatchString(m) {
+			return strings.TrimSpace(m)
+		}
+	}
+	if len(matches) > 0 {
+		return strings.TrimSpace(matches[0])
+	}
+	return ""
+}
+
+// parseApplicantsQualifier returns whether the applicant count is exact, a lower bound, or an upper bound.
+// Returns an empty string when no numeric count is present.
+func parseApplicantsQualifier(text string) models.ApplicantsQualifier {
+	if text == "" || !applicantsRe.MatchString(text) {
+		return ""
+	}
+	if applicantsGreaterThanRe.MatchString(text) {
+		return models.ApplicantsGreaterThan
+	}
+	if applicantsLessThanRe.MatchString(text) {
+		return models.ApplicantsLessThan
+	}
+	return models.ApplicantsEqual
+}
+
+// parseApplicantsCount extracts the numeric applicant count from a phrase like "142 applicants".
+// Returns nil when no number is found.
+func parseApplicantsCount(text string) *int {
+	groups := applicantsRe.FindStringSubmatch(text)
+	if groups == nil {
+		return nil
+	}
+	n, err := strconv.Atoi(groups[1])
+	if err != nil {
+		return nil
+	}
+	return &n
+}
+
+// parseAmount converts a digit string and optional "k"/"K" suffix into a numeric value.
 func parseAmount(digits, k string) float64 {
 	val, _ := strconv.ParseFloat(strings.ReplaceAll(digits, ",", ""), 64)
 	if strings.EqualFold(k, "k") {

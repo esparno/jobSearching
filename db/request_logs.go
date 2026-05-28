@@ -7,6 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// InsertRequestLog records an outbound HTTP request and its outcome.
+// Errors are written to stderr rather than returned so a logging failure never interrupts a scrape.
 func InsertRequestLog(ctx context.Context, pool *pgxpool.Pool, entry models.RequestLog) {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO request_logs (

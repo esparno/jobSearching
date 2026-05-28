@@ -30,8 +30,6 @@ func swapHTTPClient(t *testing.T, fn roundTripFunc) {
 	t.Cleanup(func() { httpClient = orig })
 }
 
-// --- SearchOptions.Validate ---
-
 var validateTests = []struct {
 	name    string
 	opts    SearchOptions
@@ -94,8 +92,6 @@ func TestSearchOptions_Validate(t *testing.T) {
 		})
 	}
 }
-
-// --- SearchJobs ---
 
 func TestSearchJobs_InvalidOptions(t *testing.T) {
 	resp, err := SearchJobs(SearchOptions{})
@@ -187,8 +183,6 @@ func TestSearchJobs_NetworkError(t *testing.T) {
 	}
 }
 
-// --- SearchJobId ---
-
 func TestSearchJobId_URL(t *testing.T) {
 	var gotURL string
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
@@ -219,8 +213,6 @@ func TestSearchJobId_NetworkError(t *testing.T) {
 		t.Fatal("expected network error, got nil")
 	}
 }
-
-// --- headersToJSON ---
 
 var headersToJSONTests = []struct {
 	name    string

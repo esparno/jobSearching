@@ -70,6 +70,8 @@ type SearchOptions struct {
 
 const jobPostingBaseURL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 
+// SearchJobs fetches a page of LinkedIn job listings matching the given options.
+// The Start field in opts controls the pagination offset.
 func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
 	if err := searchOptions.Validate(); err != nil {
 		return nil, err
@@ -94,6 +96,7 @@ func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
 	return httpClient.Get(getURL)
 }
 
+// Validate returns an error if any required SearchOptions field is missing.
 func (searchOptions SearchOptions) Validate() error {
 	if searchOptions.Keywords == "" {
 		return fmt.Errorf("Keywords is required")
@@ -107,10 +110,12 @@ func (searchOptions SearchOptions) Validate() error {
 	return nil
 }
 
+// SearchJobId fetches the detail page HTML for a single LinkedIn job posting.
 func SearchJobId(jobId string) (*http.Response, error) {
 	return httpClient.Get(jobPostingBaseURL + jobId)
 }
 
+// headersToJSON serialises an http.Header map into a compact JSON object string for logging.
 func headersToJSON(h http.Header) string {
 	b := strings.Builder{}
 	b.WriteString("{")
@@ -132,10 +137,13 @@ const (
 	maxJitter  = 3 * time.Second
 )
 
+// randomDelay sleeps for minDelay plus a random jitter to avoid rate limiting.
 func randomDelay() {
 	time.Sleep(minDelay + time.Duration(rand.Int63n(int64(maxJitter))))
 }
 
+// ScrapeJobs paginates through up to numberOfJobs listings, fetches detail pages for new ones,
+// and records a scrape run summary on completion.
 func ScrapeJobs(ctx context.Context, numberOfJobs int, opts SearchOptions, pool *pgxpool.Pool) {
 	startedAt := time.Now()
 	jobsCh := make(chan models.Job, (numberOfJobs-opts.Start)/10)
@@ -192,6 +200,8 @@ func ScrapeJobs(ctx context.Context, numberOfJobs int, opts SearchOptions, pool 
 	log.Printf("scrape complete: %d found, %d new, %d skipped", run.JobsFound, run.JobsNew, run.JobsSkipped)
 }
 
+// paginate fetches successive search result pages and sends each job to jobsCh.
+// It closes jobsCh when all pages have been processed or the results are exhausted.
 func paginate(opts SearchOptions, numberOfJobs int, jobsCh chan<- models.Job, found *atomic.Int64) {
 	defer close(jobsCh)
 	for i := opts.Start; i < numberOfJobs; i += 10 {

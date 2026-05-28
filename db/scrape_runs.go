@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// InsertScrapeRun records a completed scrape run with its aggregate counts and search parameters.
 func InsertScrapeRun(ctx context.Context, pool *pgxpool.Pool, run models.ScrapeRun) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO scrape_runs (
