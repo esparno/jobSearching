@@ -128,6 +128,12 @@ func TestParseJobDetail(t *testing.T) {
 	if detail.Description == "" {
 		t.Error("Description should not be empty")
 	}
+	if detail.ApplicantsText != "142 applicants" {
+		t.Errorf("ApplicantsText: got %q, want %q", detail.ApplicantsText, "142 applicants")
+	}
+	if detail.Applicants == nil || *detail.Applicants != 142 {
+		t.Errorf("Applicants: got %v, want 142", detail.Applicants)
+	}
 }
 
 func TestParseJobDetail_SeniorityNotApplicable(t *testing.T) {
@@ -277,3 +283,52 @@ func TestParsePayFromText(t *testing.T) {
 		})
 	}
 }
+
+// --- parseApplicantsCount ---
+
+var applicantsTests = []struct {
+	name      string
+	input     string
+	wantText  string
+	wantCount *int
+}{
+	{name: "standard", input: "142 applicants", wantText: "142 applicants", wantCount: ptrInt(142)},
+	{name: "over prefix", input: "Over 200 applicants", wantText: "Over 200 applicants", wantCount: ptrInt(200)},
+	{name: "be among first", input: "Be among the first 25 applicants", wantText: "Be among the first 25 applicants", wantCount: ptrInt(25)},
+	{name: "less than", input: "Less than 67 applicants", wantText: "Less than 67 applicants", wantCount: ptrInt(67)},
+	{name: "case insensitive", input: "142 Applicants", wantText: "142 Applicants", wantCount: ptrInt(142)},
+	{name: "singular", input: "1 applicant", wantText: "1 applicant", wantCount: ptrInt(1)},
+	{name: "no number", input: "Be an early applicant", wantText: "Be an early applicant", wantCount: nil},
+	{name: "prefers number over no-number", input: "Be an early applicant\n142 applicants", wantText: "142 applicants", wantCount: ptrInt(142)},
+	{name: "empty", input: "", wantText: "", wantCount: nil},
+}
+
+func TestParseApplicantsText(t *testing.T) {
+	for _, tt := range applicantsTests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseApplicantsText(tt.input)
+			if got != tt.wantText {
+				t.Errorf("got %q, want %q", got, tt.wantText)
+			}
+		})
+	}
+}
+
+func TestParseApplicantsCount(t *testing.T) {
+	for _, tt := range applicantsTests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseApplicantsCount(tt.input)
+			if tt.wantCount == nil && got != nil {
+				t.Errorf("got %d, want nil", *got)
+			} else if tt.wantCount != nil && (got == nil || *got != *tt.wantCount) {
+				gotStr := "<nil>"
+				if got != nil {
+					gotStr = fmt.Sprintf("%d", *got)
+				}
+				t.Errorf("got %s, want %d", gotStr, *tt.wantCount)
+			}
+		})
+	}
+}
+
+func ptrInt(n int) *int { return &n }

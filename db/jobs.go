@@ -36,10 +36,10 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job m
 	_, err := pool.Exec(ctx, `
 		INSERT INTO job_details (
 			job_id, source, source_id, seniority, employment_type, work_type,
-			job_function, industries, description, applicants,
+			job_function, industries, description, applicants_text, applicants,
 			pay_type, pay_min, pay_max, pay_text
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		ON CONFLICT (job_id) DO NOTHING
 	`,
 		jobID,
@@ -51,7 +51,8 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job m
 		nullableString(detail.JobFunction),
 		nullableString(detail.Industries),
 		nullableString(detail.Description),
-		nullableString(detail.Applicants),
+		nullableString(detail.ApplicantsText),
+		detail.Applicants,
 		nullableString(string(detail.PayType)),
 		detail.PayMin,
 		detail.PayMax,

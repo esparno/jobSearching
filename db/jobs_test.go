@@ -116,12 +116,15 @@ func TestInsertJobDetail(t *testing.T) {
 	}
 
 	payMin, payMax := 120000.0, 160000.0
+	applicantsCount := 53
 	detail := models.JobDetail{
 		SourceID:       sourceID,
 		Seniority:      "Mid-Senior level",
 		EmploymentType: "Full-time",
 		WorkType:       "Remote",
 		Description:    "Build great things.",
+		ApplicantsText: "53 applicants",
+		Applicants:     &applicantsCount,
 		PayType:        models.PayTypeSalary,
 		PayMin:         &payMin,
 		PayMax:         &payMax,
@@ -132,12 +135,13 @@ func TestInsertJobDetail(t *testing.T) {
 		t.Fatalf("InsertJobDetail: %v", err)
 	}
 
-	var storedDesc, storedPayText string
+	var storedDesc, storedPayText, storedApplicantsText string
 	var storedPayMin, storedPayMax float64
+	var storedApplicants int
 	err = pool.QueryRow(ctx, `
-		SELECT description, pay_text, pay_min, pay_max
+		SELECT description, pay_text, pay_min, pay_max, applicants_text, applicants
 		FROM job_details WHERE source_id = $1
-	`, sourceID).Scan(&storedDesc, &storedPayText, &storedPayMin, &storedPayMax)
+	`, sourceID).Scan(&storedDesc, &storedPayText, &storedPayMin, &storedPayMax, &storedApplicantsText, &storedApplicants)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -152,6 +156,12 @@ func TestInsertJobDetail(t *testing.T) {
 	}
 	if storedPayMax != payMax {
 		t.Errorf("pay_max: got %v, want %v", storedPayMax, payMax)
+	}
+	if storedApplicantsText != detail.ApplicantsText {
+		t.Errorf("applicants_text: got %q, want %q", storedApplicantsText, detail.ApplicantsText)
+	}
+	if storedApplicants != applicantsCount {
+		t.Errorf("applicants: got %d, want %d", storedApplicants, applicantsCount)
 	}
 }
 

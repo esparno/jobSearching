@@ -63,7 +63,8 @@ type JobDetail struct {
 	Company        string
 	Location       string
 	PostedAgo      string
-	Applicants     string
+	ApplicantsText string
+	Applicants     *int
 	Description    string
 	Seniority      string
 	EmploymentType string
