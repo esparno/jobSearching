@@ -104,10 +104,11 @@ func TestInsertJobDetail(t *testing.T) {
 	})
 
 	job := testJob(sourceID)
-	jobID, _, err := UpsertJob(ctx, pool, job)
+	id, _, err := UpsertJob(ctx, pool, job)
 	if err != nil {
 		t.Fatalf("UpsertJob: %v", err)
 	}
+	job.ID = id
 
 	payMin, payMax := 120000.0, 160000.0
 	applicantsCount := 53
@@ -126,7 +127,7 @@ func TestInsertJobDetail(t *testing.T) {
 		PayText:             "$120,000 - $160,000",
 	}
 
-	if err := InsertJobDetail(ctx, pool, jobID, job, detail); err != nil {
+	if err := InsertJobDetail(ctx, pool, job, detail); err != nil {
 		t.Fatalf("InsertJobDetail: %v", err)
 	}
 
@@ -173,19 +174,20 @@ func TestInsertJobDetail_Idempotent(t *testing.T) {
 	})
 
 	job := testJob(sourceID)
-	jobID, _, err := UpsertJob(ctx, pool, job)
+	id, _, err := UpsertJob(ctx, pool, job)
 	if err != nil {
 		t.Fatalf("UpsertJob: %v", err)
 	}
+	job.ID = id
 
 	first := models.JobDetail{SourceID: sourceID, Description: "First"}
-	if err := InsertJobDetail(ctx, pool, jobID, job, first); err != nil {
+	if err := InsertJobDetail(ctx, pool, job, first); err != nil {
 		t.Fatalf("first InsertJobDetail: %v", err)
 	}
 
 	// Second insert should be silently ignored (ON CONFLICT DO NOTHING).
 	second := models.JobDetail{SourceID: sourceID, Description: "Second"}
-	if err := InsertJobDetail(ctx, pool, jobID, job, second); err != nil {
+	if err := InsertJobDetail(ctx, pool, job, second); err != nil {
 		t.Fatalf("second InsertJobDetail: %v", err)
 	}
 
@@ -206,13 +208,14 @@ func TestInsertJobDetail_NullPayFields(t *testing.T) {
 	})
 
 	job := testJob(sourceID)
-	jobID, _, err := UpsertJob(ctx, pool, job)
+	id, _, err := UpsertJob(ctx, pool, job)
 	if err != nil {
 		t.Fatalf("UpsertJob: %v", err)
 	}
+	job.ID = id
 
 	detail := models.JobDetail{SourceID: sourceID, Description: "No pay info"}
-	if err := InsertJobDetail(ctx, pool, jobID, job, detail); err != nil {
+	if err := InsertJobDetail(ctx, pool, job, detail); err != nil {
 		t.Fatalf("InsertJobDetail: %v", err)
 	}
 

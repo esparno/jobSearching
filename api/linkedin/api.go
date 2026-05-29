@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/imroc/req/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -111,6 +112,16 @@ type SearchOptions struct {
 
 const jobPostingBaseURL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 
+// getUrl applies a random delay then performs a GET request, returning the underlying *http.Response.
+func getUrl(url string) (*http.Response, error) {
+	randomDelay()
+	resp, err := httpClient.R().Get(url)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Response, nil
+}
+
 // SearchJobs fetches a page of LinkedIn job listings matching the given options.
 // The Start field in opts controls the pagination offset.
 func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
@@ -134,11 +145,7 @@ func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
 
 	getURL := searchURL + "?" + params.Encode()
 	log.Printf("GET %s", getURL)
-	resp, err := httpClient.R().Get(getURL)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Response, nil
+	return getUrl(getURL)
 }
 
 // Validate returns an error if any required SearchOptions field is missing.
@@ -157,11 +164,7 @@ func (searchOptions SearchOptions) Validate() error {
 
 // SearchJobId fetches the detail page HTML for a single LinkedIn job posting.
 func SearchJobId(jobId string) (*http.Response, error) {
-	resp, err := httpClient.R().Get(jobPostingBaseURL + jobId)
-	if err != nil {
-		return nil, err
-	}
-	return resp.Response, nil
+	return getUrl(jobPostingBaseURL + jobId)
 }
 
 // headersToJSON serialises an http.Header map into a compact JSON object string for logging.
@@ -181,7 +184,7 @@ func headersToJSON(h http.Header) string {
 }
 
 const (
-	numWorkers      = 1
+	numWorkers      = 5
 	minDelay        = 3 * time.Second
 	maxJitter       = 7 * time.Second
 	macroBreakEvery = 200
@@ -208,41 +211,18 @@ func randomDelay() {
 // and records a scrape run summary on completion.
 func ScrapeJobs(ctx context.Context, numberOfJobs int, opts SearchOptions, pool *pgxpool.Pool) {
 	startedAt := time.Now()
-	jobsCh := make(chan models.Job, (numberOfJobs-opts.Start)/10)
-
-	var found atomic.Int64
-	go paginate(opts, numberOfJobs, jobsCh, &found)
+	runId := uuid.New().String()
 
 	var (
-		wg      sync.WaitGroup
 		saved   atomic.Int64
 		skipped atomic.Int64
+		found   atomic.Int64
 	)
-	for range numWorkers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for job := range jobsCh {
-				isNew, err := processJob(ctx, pool, job, opts.WorkType)
-				if err != nil {
-					log.Printf("failed to process job %s: %v", job.SourceID, err)
-					continue
-				}
-				if isNew {
-					saved.Add(1)
-					log.Printf("saved: %s | %s | %s", job.SourceID, job.Title, job.Company)
-					randomDelay()
-				} else {
-					skipped.Add(1)
-					log.Printf("skipped: %s | %s | %s", job.SourceID, job.Title, job.Company)
-				}
-			}
-		}()
-	}
-
-	wg.Wait()
+	processAllJobs(ctx, pool, opts, numberOfJobs, &found, runId)
+	processAllJobDetails(ctx, pool, opts.WorkType, runId, &saved, &skipped)
 
 	run := models.ScrapeRun{
+		RunID:       runId,
 		Source:      models.LinkedIn,
 		Keywords:    string(opts.Keywords),
 		TimePosted:  string(opts.TimePosted),
@@ -262,58 +242,108 @@ func ScrapeJobs(ctx context.Context, numberOfJobs int, opts SearchOptions, pool 
 	log.Printf("scrape complete: %d found, %d new, %d skipped", run.JobsFound, run.JobsNew, run.JobsSkipped)
 }
 
-// paginate fetches successive search result pages and sends each job to jobsCh.
-// It closes jobsCh when all pages have been processed or the results are exhausted.
-func paginate(opts SearchOptions, numberOfJobs int, jobsCh chan<- models.Job, found *atomic.Int64) {
-	defer close(jobsCh)
-	for i := opts.Start; i < numberOfJobs; i += 10 {
-		searchOptions := opts
-		searchOptions.Start = i
-
-		resp, err := SearchJobs(searchOptions)
-		if err != nil {
-			log.Printf("failed to fetch page at start=%d: %v", i, err)
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		_ = resp.Body.Close()
-		if err != nil {
-			log.Printf("failed to read page body at start=%d: %v", i, err)
-			continue
-		}
-
-		jobs, err := ParseJobs(string(body), models.LinkedIn)
-		if err != nil {
-			log.Printf("failed to parse page at start=%d: %v", i, err)
-			continue
-		}
-
-		if len(jobs) == 0 {
-			log.Printf("no jobs returned at start=%d, stopping early", i)
-			break
-		}
-
-		found.Add(int64(len(jobs)))
-		log.Printf("page start=%d: found %d jobs", i, len(jobs))
-		for _, job := range jobs {
-			jobsCh <- job
-		}
-
-		randomDelay()
+// processAllJobDetails fetches all new jobs for the run from the DB and concurrently
+// retrieves their detail pages, saving results and updating saved/skipped counts.
+func processAllJobDetails(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	workType models.WorkType,
+	runId string,
+	saved *atomic.Int64,
+	skipped *atomic.Int64) {
+	jobs, err := db.GetNewJobsByRunID(ctx, pool, runId)
+	if err != nil {
+		log.Printf("failed to get jobs for run %s: %v", runId, err)
+		return
 	}
+
+	wg := sync.WaitGroup{}
+	sem := make(chan struct{}, numWorkers)
+	for _, job := range jobs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			if err := processJobDetail(ctx, pool, job, workType); err != nil {
+				log.Printf("failed to process job detail %s: %v", job.SourceID, err)
+				skipped.Add(1)
+				return
+			}
+			saved.Add(1)
+			log.Printf("saved: %s | %s | %s", job.SourceID, job.Title, job.Company)
+		}()
+	}
+	wg.Wait()
 }
 
-// processJob upserts the listing and, for new jobs, fetches and saves the detail page.
-// Returns (true, nil) if saved, (false, nil) if already seen, or (false, err) on failure.
-func processJob(ctx context.Context, pool *pgxpool.Pool, job models.Job, workType models.WorkType) (bool, error) {
-	jobID, isNew, err := db.UpsertJob(ctx, pool, job)
+// processAllJobs concurrently fetches all search result pages up to numberOfJobs
+// and upserts each discovered listing into the database tagged with runId.
+func processAllJobs(ctx context.Context,
+	pool *pgxpool.Pool,
+	opts SearchOptions, numberOfJobs int, found *atomic.Int64, runId string) {
+	wg := sync.WaitGroup{}
+	sem := make(chan struct{}, numWorkers)
+	for i := opts.Start; i < numberOfJobs; i += 10 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			searchOptions := opts
+			searchOptions.Start = i
+			_ = processJob(ctx, pool, searchOptions, found, runId)
+		}()
+	}
+	wg.Wait()
+}
+
+// processJob fetches one search result page, parses the listings, and upserts each
+// into the database. found is incremented by the number of jobs returned by LinkedIn.
+func processJob(
+	ctx context.Context, pool *pgxpool.Pool,
+	searchOptions SearchOptions, found *atomic.Int64, runId string) error {
+	resp, err := SearchJobs(searchOptions)
 	if err != nil {
-		return false, fmt.Errorf("upsert: %w", err)
+		log.Printf("failed to fetch page at start=%d: %v", searchOptions.Start, err)
+		return err
 	}
-	if !isNew {
-		return false, nil
+
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		log.Printf("failed to read page body at start=%d: %v", searchOptions.Start, err)
+		return err
 	}
+
+	jobs, err := ParseJobs(string(body), models.LinkedIn)
+	if err != nil {
+		log.Printf("failed to parse page at start=%d: %v", searchOptions.Start, err)
+		return err
+	}
+
+	if len(jobs) == 0 {
+		log.Printf("no jobs returned at start=%d, stopping early", searchOptions.Start)
+		return nil
+	}
+
+	found.Add(int64(len(jobs)))
+	log.Printf("page start=%d: found %d jobs", searchOptions.Start, len(jobs))
+
+	for _, job := range jobs {
+		job.RunID = runId
+		if _, _, err := db.UpsertJob(ctx, pool, job); err != nil {
+			log.Printf("failed to upsert job %s: %v", job.SourceID, err)
+		}
+	}
+
+	return nil
+}
+
+// processJobDetail fetches and saves the detail page for a job that was discovered in the
+// current run. Returns nil on success or a non-nil error on failure.
+func processJobDetail(ctx context.Context, pool *pgxpool.Pool, job models.Job, workType models.WorkType) error {
 
 	baseLog := models.RequestLog{
 		Source:         models.LinkedIn,
@@ -329,7 +359,7 @@ func processJob(ctx context.Context, pool *pgxpool.Pool, job models.Job, workTyp
 		entry.Message = "network error fetching job detail"
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return false, fmt.Errorf("fetch detail: %w", err)
+		return fmt.Errorf("fetch detail: %w", err)
 	}
 
 	statusCode := resp.StatusCode
@@ -344,7 +374,7 @@ func processJob(ctx context.Context, pool *pgxpool.Pool, job models.Job, workTyp
 		entry.Message = "failed to read response body"
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return false, fmt.Errorf("read body: %w", err)
+		return fmt.Errorf("read body: %w", err)
 	}
 	bodyStr := string(body)
 
@@ -354,7 +384,7 @@ func processJob(ctx context.Context, pool *pgxpool.Pool, job models.Job, workTyp
 		entry.ResponseBody = bodyStr
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return false, fmt.Errorf("unexpected status %d for job %s", statusCode, job.SourceID)
+		return fmt.Errorf("unexpected status %d for job %s", statusCode, job.SourceID)
 	}
 
 	detail, err := ParseJobDetail(bodyStr)
@@ -365,7 +395,7 @@ func processJob(ctx context.Context, pool *pgxpool.Pool, job models.Job, workTyp
 		entry.ResponseBody = bodyStr
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return false, fmt.Errorf("parse detail: %w", err)
+		return fmt.Errorf("parse detail: %w", err)
 	}
 
 	detail.WorkType = string(workType)
@@ -381,9 +411,9 @@ func processJob(ctx context.Context, pool *pgxpool.Pool, job models.Job, workTyp
 	}
 	db.InsertRequestLog(ctx, pool, entry)
 
-	if err := db.InsertJobDetail(ctx, pool, jobID, job, detail); err != nil {
-		return false, fmt.Errorf("insert detail: %w", err)
+	if err := db.InsertJobDetail(ctx, pool, job, detail); err != nil {
+		return fmt.Errorf("insert detail: %w", err)
 	}
 
-	return true, nil
+	return nil
 }

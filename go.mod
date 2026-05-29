@@ -3,6 +3,7 @@ module jobSearching
 go 1.26
 
 require (
+    github.com/google/uuid v1.6.0
 	github.com/PuerkitoBio/goquery v1.12.0 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect

@@ -13,8 +13,8 @@ func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, 
 	var id int64
 	var isNew bool
 	err := pool.QueryRow(ctx, `
-		INSERT INTO jobs (source, source_id, title, company, location, url, posted_date)
-		VALUES ($1, $2, $3, $4, $5, $6, $7::date)
+		INSERT INTO jobs (source, source_id, title, company, location, url, posted_date, run_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8)
 		ON CONFLICT (source, source_id) DO UPDATE SET last_seen = NOW()
 		RETURNING id, (xmax = 0) AS is_new
 	`,
@@ -25,24 +25,25 @@ func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, 
 		nullableString(job.Location),
 		nullableString(job.URL),
 		nullableString(job.PostedDate),
+		job.RunID,
 	).Scan(&id, &isNew)
 
 	return id, isNew, err
 }
 
-// InsertJobDetail saves the full detail page data for a job identified by jobID.
+// InsertJobDetail saves the full detail page data for a job.
 // Does nothing if a detail row already exists for that job (ON CONFLICT DO NOTHING).
-func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job models.Job, detail models.JobDetail) error {
+func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, job models.Job, detail models.JobDetail) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO job_details (
 			job_id, source, source_id, seniority, employment_type, work_type,
 			job_function, industries, description, applicants_text, applicants, applicants_qualifier,
-			pay_type, pay_min, pay_max, pay_text
+			pay_type, pay_min, pay_max, pay_text, run_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		ON CONFLICT (job_id) DO NOTHING
 	`,
-		jobID,
+		job.ID,
 		job.Source,
 		job.SourceID,
 		nullableString(detail.Seniority),
@@ -58,8 +59,56 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, jobID int64, job m
 		detail.PayMin,
 		detail.PayMax,
 		nullableString(detail.PayText),
+		job.RunID,
 	)
 	return err
+}
+
+// GetNewJobsByRunID returns all jobs inserted during the given run that do not yet have a detail record.
+func GetNewJobsByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([]models.Job, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT j.id, j.source, j.source_id, j.title, j.company, j.location, j.url,
+		       COALESCE(j.posted_date::text, ''), j.run_id
+		FROM jobs j
+		LEFT JOIN job_details jd ON jd.job_id = j.id
+		WHERE j.run_id = $1
+		AND jd.id IS NULL
+	`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []models.Job
+	for rows.Next() {
+		var (
+			job                                        models.Job
+			title, company, location, url, postedDate *string
+		)
+		if err := rows.Scan(
+			&job.ID, &job.Source, &job.SourceID,
+			&title, &company, &location, &url, &postedDate, &job.RunID,
+		); err != nil {
+			return nil, err
+		}
+		if title != nil {
+			job.Title = *title
+		}
+		if company != nil {
+			job.Company = *company
+		}
+		if location != nil {
+			job.Location = *location
+		}
+		if url != nil {
+			job.URL = *url
+		}
+		if postedDate != nil {
+			job.PostedDate = *postedDate
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, rows.Err()
 }
 
 // nullableString returns nil for empty strings so that optional fields are stored as SQL NULL.

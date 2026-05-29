@@ -1,11 +1,13 @@
 package linkedin
 
 import (
+	"context"
 	"errors"
 	"io"
 	"jobSearching/models"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/imroc/req/v3"
@@ -240,6 +242,40 @@ var headersToJSONTests = []struct {
 		headers: http.Header{"Accept": {"text/html", "application/json"}},
 		want:    `{"Accept":"text/html, application/json"}`,
 	},
+}
+
+func TestProcessJob_NetworkError(t *testing.T) {
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		return nil, errors.New("connection refused")
+	})
+
+	var found atomic.Int64
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+
+	err := processJob(context.Background(), nil, opts, &found, "run-1")
+	if err == nil {
+		t.Error("expected error on network failure, got nil")
+	}
+	if found.Load() != 0 {
+		t.Errorf("found: got %d, want 0", found.Load())
+	}
+}
+
+func TestProcessJob_EmptyPage(t *testing.T) {
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		return mockResponse(200, ""), nil
+	})
+
+	var found atomic.Int64
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+
+	err := processJob(context.Background(), nil, opts, &found, "run-1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if found.Load() != 0 {
+		t.Errorf("found: got %d, want 0", found.Load())
+	}
 }
 
 func TestHeadersToJSON(t *testing.T) {
