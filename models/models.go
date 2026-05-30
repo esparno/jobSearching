@@ -68,6 +68,7 @@ type RequestLog struct {
 	Message        string
 	ResponseBody   string
 	IsIssue        bool
+	RunID          string
 }
 
 type JobDetail struct {
