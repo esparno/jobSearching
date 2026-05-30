@@ -219,6 +219,7 @@ func ScrapeJobs(ctx context.Context, numberOfJobs int, opts SearchOptions, pool 
 	retryFailedJobs(ctx, pool, opts, &found, runId)
 	processAllJobDetails(ctx, pool, opts.WorkType, runId, &saved, &skipped)
 	retryFailedJobDetails(ctx, pool, opts.WorkType, runId, &saved, &skipped)
+	processApplicantUpdates(ctx, pool, opts.WorkType, runId)
 
 	run := models.ScrapeRun{
 		RunID:       runId,
@@ -314,6 +315,36 @@ func retryFailedJobDetails(
 			skipped.Add(-1)
 			saved.Add(1)
 			log.Printf("retry saved: %s", job.SourceID)
+		}()
+	}
+	wg.Wait()
+}
+
+// processApplicantUpdates re-fetches detail pages for jobs from the current run that already
+// have a detail record but still have an applicant count below the 200-applicant cap.
+func processApplicantUpdates(ctx context.Context, pool *pgxpool.Pool, workType models.WorkType, runId string) {
+	jobs, err := db.GetJobsForApplicantUpdateByRunID(ctx, pool, runId)
+	if err != nil {
+		log.Printf("failed to get jobs for applicant update: %v", err)
+		return
+	}
+	if len(jobs) == 0 {
+		return
+	}
+	log.Printf("updating applicants for %d jobs", len(jobs))
+
+	wg := sync.WaitGroup{}
+	sem := make(chan struct{}, numWorkers)
+	for _, job := range jobs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			if err := processJobDetail(ctx, pool, job, workType); err != nil {
+				log.Printf("failed to update applicants for job %s: %v", job.SourceID, err)
+			}
 		}()
 	}
 	wg.Wait()

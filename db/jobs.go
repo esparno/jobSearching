@@ -15,7 +15,7 @@ func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, 
 	err := pool.QueryRow(ctx, `
 		INSERT INTO jobs (source, source_id, title, company, location, url, posted_date, run_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8)
-		ON CONFLICT (source, source_id) DO UPDATE SET last_seen = NOW()
+		ON CONFLICT (source, source_id) DO UPDATE SET last_seen = NOW(), run_id = EXCLUDED.run_id
 		RETURNING id, (xmax = 0) AS is_new
 	`,
 		job.Source,
@@ -78,6 +78,32 @@ func GetNewJobsByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([
 		LEFT JOIN job_details jd ON jd.job_id = j.id
 		WHERE j.run_id = $1
 		AND jd.id IS NULL
+	`, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var jobs []models.Job
+	for rows.Next() {
+		var job models.Job
+		if err := rows.Scan(&job.ID, &job.Source, &job.SourceID, &job.RunID); err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, job)
+	}
+	return jobs, rows.Err()
+}
+
+// GetJobsForApplicantUpdateByRunID returns jobs from the current run that already have a
+// detail record but whose applicant count is still below the 200-applicant cap.
+func GetJobsForApplicantUpdateByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([]models.Job, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT j.id, j.source, j.source_id, j.run_id
+		FROM jobs j
+		JOIN job_details jd ON jd.job_id = j.id
+		WHERE j.run_id = $1
+		AND (jd.applicants IS NULL OR jd.applicants < 200)
 	`, runID)
 	if err != nil {
 		return nil, err
