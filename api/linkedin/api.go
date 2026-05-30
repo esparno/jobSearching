@@ -2,6 +2,7 @@ package linkedin
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"jobSearching/db"
@@ -113,9 +114,9 @@ type SearchOptions struct {
 const jobPostingBaseURL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 
 // getUrl applies a random delay then performs a GET request, returning the underlying *http.Response.
-func getUrl(url string) (*http.Response, error) {
+func getUrl(ctx context.Context, url string) (*http.Response, error) {
 	randomDelay()
-	resp, err := httpClient.R().Get(url)
+	resp, err := httpClient.R().SetContext(ctx).Get(url)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +125,7 @@ func getUrl(url string) (*http.Response, error) {
 
 // SearchJobs fetches a page of LinkedIn job listings matching the given options.
 // The Start field in opts controls the pagination offset.
-func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
+func SearchJobs(ctx context.Context, searchOptions SearchOptions) (*http.Response, error) {
 	if err := searchOptions.Validate(); err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func SearchJobs(searchOptions SearchOptions) (*http.Response, error) {
 
 	getURL := searchURL + "?" + params.Encode()
 	log.Printf("GET %s", getURL)
-	return getUrl(getURL)
+	return getUrl(ctx, getURL)
 }
 
 // Validate returns an error if any required SearchOptions field is missing.
@@ -163,24 +164,18 @@ func (searchOptions SearchOptions) Validate() error {
 }
 
 // SearchJobId fetches the detail page HTML for a single LinkedIn job posting.
-func SearchJobId(jobId string) (*http.Response, error) {
-	return getUrl(jobPostingBaseURL + jobId)
+func SearchJobId(ctx context.Context, jobId string) (*http.Response, error) {
+	return getUrl(ctx, jobPostingBaseURL+jobId)
 }
 
 // headersToJSON serialises an http.Header map into a compact JSON object string for logging.
 func headersToJSON(h http.Header) string {
-	b := strings.Builder{}
-	b.WriteString("{")
-	first := true
+	m := make(map[string]string, len(h))
 	for k, vals := range h {
-		if !first {
-			b.WriteString(",")
-		}
-		_, _ = fmt.Fprintf(&b, "%q:%q", k, strings.Join(vals, ", "))
-		first = false
+		m[k] = strings.Join(vals, ", ")
 	}
-	b.WriteString("}")
-	return b.String()
+	b, _ := json.Marshal(m)
+	return string(b)
 }
 
 const (
@@ -304,7 +299,7 @@ func processAllJobs(ctx context.Context,
 func processJob(
 	ctx context.Context, pool *pgxpool.Pool,
 	searchOptions SearchOptions, found *atomic.Int64, runId string) error {
-	resp, err := SearchJobs(searchOptions)
+	resp, err := SearchJobs(ctx, searchOptions)
 	if err != nil {
 		log.Printf("failed to fetch page at start=%d: %v", searchOptions.Start, err)
 		return err
@@ -352,7 +347,7 @@ func processJobDetail(ctx context.Context, pool *pgxpool.Pool, job models.Job, w
 		RequestHeaders: "{}",
 	}
 
-	resp, err := SearchJobId(job.SourceID)
+	resp, err := SearchJobId(ctx, job.SourceID)
 	if err != nil {
 		entry := baseLog
 		entry.Error = err.Error()

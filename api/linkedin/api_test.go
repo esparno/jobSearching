@@ -102,7 +102,7 @@ func TestSearchOptions_Validate(t *testing.T) {
 }
 
 func TestSearchJobs_InvalidOptions(t *testing.T) {
-	resp, err := SearchJobs(SearchOptions{})
+	resp, err := SearchJobs(context.Background(), SearchOptions{})
 	if err == nil {
 		_ = resp.Body.Close()
 		t.Fatal("expected error for empty SearchOptions, got nil")
@@ -126,7 +126,7 @@ func TestSearchJobs_URLParams(t *testing.T) {
 		JobType:    FullTime,
 		Start:      20,
 	}
-	resp, err := SearchJobs(opts)
+	resp, err := SearchJobs(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestSearchJobs_NoJobType(t *testing.T) {
 		TimePosted: OneDay,
 		WorkType:   models.Remote,
 	}
-	resp, err := SearchJobs(opts)
+	resp, err := SearchJobs(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestSearchJobs_NetworkError(t *testing.T) {
 		TimePosted: OneDay,
 		WorkType:   models.Remote,
 	}
-	resp, err := SearchJobs(opts)
+	resp, err := SearchJobs(context.Background(), opts)
 	if err == nil {
 		_ = resp.Body.Close()
 		t.Fatal("expected network error, got nil")
@@ -198,7 +198,7 @@ func TestSearchJobId_URL(t *testing.T) {
 		return mockResponse(200, ""), nil
 	})
 
-	resp, err := SearchJobId("abc123")
+	resp, err := SearchJobId(context.Background(), "abc123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestSearchJobId_NetworkError(t *testing.T) {
 		return nil, errors.New("connection refused")
 	})
 
-	resp, err := SearchJobId("abc123")
+	resp, err := SearchJobId(context.Background(), "abc123")
 	if err == nil {
 		_ = resp.Body.Close()
 		t.Fatal("expected network error, got nil")
