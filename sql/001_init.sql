@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     posted_date   DATE,
     first_seen    TIMESTAMP NOT NULL DEFAULT NOW(),
     last_seen     TIMESTAMP NOT NULL DEFAULT NOW(),
-    UNIQUE (source, source_id)
+    UNIQUE (source, source_id),
+    run_id        TEXT      NOT NULL
 );
 
 COMMENT ON COLUMN jobs.id            IS 'Internal auto-generated ID';
@@ -22,6 +23,7 @@ COMMENT ON COLUMN jobs.url           IS 'Direct URL to the job listing';
 COMMENT ON COLUMN jobs.posted_date   IS 'Date the job was posted according to the board';
 COMMENT ON COLUMN jobs.first_seen    IS 'Timestamp when this job was first scraped';
 COMMENT ON COLUMN jobs.last_seen     IS 'Timestamp of the most recent scrape run that returned this job';
+COMMENT ON COLUMN jobs.run_id        IS 'Unique ID of the job run';
 
 CREATE TABLE IF NOT EXISTS job_details (
     id              BIGSERIAL PRIMARY KEY,
@@ -44,7 +46,8 @@ CREATE TABLE IF NOT EXISTS job_details (
     description_tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', COALESCE(description, ''))) STORED,
     fetched_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (job_id),
-    UNIQUE (source, source_id)
+    UNIQUE (source, source_id),
+    run_id        TEXT      NOT NULL
 );
 
 COMMENT ON COLUMN job_details.id              IS 'Internal auto-generated ID';
@@ -65,5 +68,6 @@ COMMENT ON COLUMN job_details.pay_text        IS 'Raw pay text as scraped, for r
 COMMENT ON COLUMN job_details.description_tsv  IS 'Auto-generated tsvector of description for full text search';
 COMMENT ON CONSTRAINT job_details_job_id_key ON job_details IS 'Each job can only have one detail record';
 COMMENT ON COLUMN job_details.fetched_at       IS 'Timestamp when the job details were fetched';
+COMMENT ON COLUMN jobs.run_id                  IS 'Unique ID of the job run';
 
 CREATE INDEX idx_job_details_description_tsv ON job_details USING GIN(description_tsv);

@@ -11,11 +11,12 @@ import (
 func InsertScrapeRun(ctx context.Context, pool *pgxpool.Pool, run models.ScrapeRun) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO scrape_runs (
-			source, keywords, time_posted, work_type, job_type,
+			run_id, source, keywords, time_posted, work_type, job_type,
 			started_at, finished_at, jobs_found, jobs_new, jobs_skipped
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 	`,
+		run.RunID,
 		run.Source,
 		run.Keywords,
 		run.TimePosted,

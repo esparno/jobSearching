@@ -1,11 +1,13 @@
 package linkedin
 
 import (
+	"context"
 	"errors"
 	"io"
 	"jobSearching/models"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/imroc/req/v3"
@@ -100,7 +102,7 @@ func TestSearchOptions_Validate(t *testing.T) {
 }
 
 func TestSearchJobs_InvalidOptions(t *testing.T) {
-	resp, err := SearchJobs(SearchOptions{})
+	resp, err := SearchJobs(context.Background(), SearchOptions{})
 	if err == nil {
 		_ = resp.Body.Close()
 		t.Fatal("expected error for empty SearchOptions, got nil")
@@ -124,7 +126,7 @@ func TestSearchJobs_URLParams(t *testing.T) {
 		JobType:    FullTime,
 		Start:      20,
 	}
-	resp, err := SearchJobs(opts)
+	resp, err := SearchJobs(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,7 +163,7 @@ func TestSearchJobs_NoJobType(t *testing.T) {
 		TimePosted: OneDay,
 		WorkType:   models.Remote,
 	}
-	resp, err := SearchJobs(opts)
+	resp, err := SearchJobs(context.Background(), opts)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -182,7 +184,7 @@ func TestSearchJobs_NetworkError(t *testing.T) {
 		TimePosted: OneDay,
 		WorkType:   models.Remote,
 	}
-	resp, err := SearchJobs(opts)
+	resp, err := SearchJobs(context.Background(), opts)
 	if err == nil {
 		_ = resp.Body.Close()
 		t.Fatal("expected network error, got nil")
@@ -196,7 +198,7 @@ func TestSearchJobId_URL(t *testing.T) {
 		return mockResponse(200, ""), nil
 	})
 
-	resp, err := SearchJobId("abc123")
+	resp, err := SearchJobId(context.Background(), "abc123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -213,7 +215,7 @@ func TestSearchJobId_NetworkError(t *testing.T) {
 		return nil, errors.New("connection refused")
 	})
 
-	resp, err := SearchJobId("abc123")
+	resp, err := SearchJobId(context.Background(), "abc123")
 	if err == nil {
 		_ = resp.Body.Close()
 		t.Fatal("expected network error, got nil")
@@ -240,6 +242,40 @@ var headersToJSONTests = []struct {
 		headers: http.Header{"Accept": {"text/html", "application/json"}},
 		want:    `{"Accept":"text/html, application/json"}`,
 	},
+}
+
+func TestProcessJob_NetworkError(t *testing.T) {
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		return nil, errors.New("connection refused")
+	})
+
+	var found atomic.Int64
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+
+	err := processJob(context.Background(), nil, opts, &found, "run-1")
+	if err == nil {
+		t.Error("expected error on network failure, got nil")
+	}
+	if found.Load() != 0 {
+		t.Errorf("found: got %d, want 0", found.Load())
+	}
+}
+
+func TestProcessJob_EmptyPage(t *testing.T) {
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		return mockResponse(200, ""), nil
+	})
+
+	var found atomic.Int64
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+
+	err := processJob(context.Background(), nil, opts, &found, "run-1")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if found.Load() != 0 {
+		t.Errorf("found: got %d, want 0", found.Load())
+	}
 }
 
 func TestHeadersToJSON(t *testing.T) {

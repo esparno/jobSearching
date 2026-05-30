@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS scrape_runs (
     id           BIGSERIAL  PRIMARY KEY,
+    run_id       TEXT       NOT NULL,
     source       TEXT       NOT NULL,
     keywords     TEXT       NOT NULL,
     time_posted  TEXT       NOT NULL,

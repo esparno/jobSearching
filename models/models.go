@@ -33,6 +33,7 @@ const (
 )
 
 type Job struct {
+	ID         int64
 	Source     string
 	SourceID   string
 	Title      string
@@ -40,9 +41,11 @@ type Job struct {
 	Location   string
 	URL        string
 	PostedDate string // YYYY-MM-DD
+	RunID      string
 }
 
 type ScrapeRun struct {
+	RunID       string
 	Source      string
 	Keywords    string
 	TimePosted  string
@@ -68,22 +71,23 @@ type RequestLog struct {
 }
 
 type JobDetail struct {
-	SourceID       string
-	Title          string
-	Company        string
-	Location       string
-	PostedAgo      string
+	SourceID            string
+	Title               string
+	Company             string
+	Location            string
+	PostedAgo           string
 	ApplicantsText      string
 	Applicants          *int
 	ApplicantsQualifier ApplicantsQualifier
-	Description    string
-	Seniority      string
-	EmploymentType string
-	WorkType       string
-	JobFunction    string
-	Industries     string
-	PayType        PayType
-	PayMin         *float64
-	PayMax         *float64
-	PayText        string
+	Description         string
+	Seniority           string
+	EmploymentType      string
+	WorkType            string
+	JobFunction         string
+	Industries          string
+	PayType             PayType
+	PayMin              *float64
+	PayMax              *float64
+	PayText             string
+	RunID               string
 }

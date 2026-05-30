@@ -1,6 +1,7 @@
 package linkedin
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"testing"
@@ -44,7 +45,7 @@ func TestAcceptLanguageHeader(t *testing.T) {
 	})
 	t.Cleanup(func() { httpClient = orig })
 
-	_, _ = SearchJobId("test123")
+	_, _ = SearchJobId(context.Background(), "test123")
 
 	const want = "en-US,en;q=0.9"
 	if gotLang != want {
@@ -98,8 +99,8 @@ func TestNoCookieForwarding(t *testing.T) {
 	})
 	t.Cleanup(func() { httpClient = orig })
 
-	_, _ = SearchJobId("111")
-	_, _ = SearchJobId("222")
+	_, _ = SearchJobId(context.Background(), "111")
+	_, _ = SearchJobId(context.Background(), "222")
 
 	if len(secondReqCookies) > 0 {
 		t.Errorf("cookies leaked into second request: %v", secondReqCookies)
