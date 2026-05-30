@@ -3,7 +3,10 @@ package linkedin
 import (
 	"fmt"
 	"jobSearching/models"
+	"strings"
 	"testing"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 const jobsHTML = `
@@ -64,6 +67,7 @@ func TestParseJobs_Empty(t *testing.T) {
 
 const detailHTML = `
 <h2 class="top-card-layout__title">Backend Engineer</h2>
+<a class="topcard__link" href="https://www.linkedin.com/jobs/view/backend-engineer-at-techco-999?trk=public_jobs_topcard-title">Backend Engineer</a>
 <a class="topcard__org-name-link">TechCo</a>
 <span class="topcard__flavor--bullet">San Francisco, CA</span>
 <span class="posted-time-ago__text">3 days ago</span>
@@ -123,6 +127,12 @@ func TestParseJobDetail(t *testing.T) {
 	}
 	if detail.Description == "" {
 		t.Error("Description should not be empty")
+	}
+	if detail.ApplyURL != "https://www.linkedin.com/jobs/view/backend-engineer-at-techco-999" {
+		t.Errorf("ApplyURL: got %q, want %q", detail.ApplyURL, "https://www.linkedin.com/jobs/view/backend-engineer-at-techco-999")
+	}
+	if detail.ApplyURL2 != "" {
+		t.Errorf("ApplyURL2: expected empty, got %q", detail.ApplyURL2)
 	}
 	if detail.ApplicantsText != "142 applicants" {
 		t.Errorf("ApplicantsText: got %q, want %q", detail.ApplicantsText, "142 applicants")
@@ -380,6 +390,78 @@ func TestParseApplicantsCount(t *testing.T) {
 }
 
 func ptrInt(n int) *int { return &n }
+
+func TestParseApplyURL2(t *testing.T) {
+	tests := []struct {
+		name string
+		html string
+		want string
+	}{
+		{
+			name: "ATS domain",
+			html: `<a href="https://boards.greenhouse.io/acme/jobs/123">Apply</a>`,
+			want: "https://boards.greenhouse.io/acme/jobs/123",
+		},
+		{
+			name: "lever ATS",
+			html: `<a href="https://jobs.lever.co/acme/abc-123">Apply</a>`,
+			want: "https://jobs.lever.co/acme/abc-123",
+		},
+		{
+			name: "careers path",
+			html: `<a href="https://acme.com/careers/software-engineer">Apply</a>`,
+			want: "https://acme.com/careers/software-engineer",
+		},
+		{
+			name: "jobs path",
+			html: `<a href="https://acme.com/jobs/123">Apply</a>`,
+			want: "https://acme.com/jobs/123",
+		},
+		{
+			name: "careers subdomain",
+			html: `<a href="https://careers.acme.com">Apply</a>`,
+			want: "https://careers.acme.com",
+		},
+		{
+			name: "jobs subdomain",
+			html: `<a href="https://jobs.acme.com/openings/swe">Apply</a>`,
+			want: "https://jobs.acme.com/openings/swe",
+		},
+		{
+			name: "linkedin url skipped",
+			html: `<a href="https://www.linkedin.com/jobs/view/123">View</a>`,
+			want: "",
+		},
+		{
+			name: "relative url skipped",
+			html: `<a href="/apply">Apply</a>`,
+			want: "",
+		},
+		{
+			name: "no match",
+			html: `<a href="https://acme.com/about">About us</a>`,
+			want: "",
+		},
+		{
+			name: "prefers first match",
+			html: `<a href="https://acme.com/about">About</a><a href="https://boards.greenhouse.io/acme/jobs/1">Apply</a><a href="https://jobs.lever.co/acme/2">Also Apply</a>`,
+			want: "https://boards.greenhouse.io/acme/jobs/1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc, err := goquery.NewDocumentFromReader(strings.NewReader(tt.html))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got := parseApplyURL2(doc)
+			if got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestParseApplicantsQualifier(t *testing.T) {
 	tests := []struct {

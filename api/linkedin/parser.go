@@ -1,6 +1,7 @@
 package linkedin
 
 import (
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,6 +12,17 @@ import (
 )
 
 var (
+	atsHosts = []string{
+		"greenhouse.io", "lever.co",
+		"workday.com", "myworkdayjobs.com",
+		"icims.com", "taleo.net",
+		"smartrecruiters.com", "jobvite.com",
+		"bamboohr.com", "ashbyhq.com",
+		"rippling.com", "jazz.co",
+	}
+	applyPathRe    = regexp.MustCompile(`(?i)/(apply|careers|jobs|job|application|openings)(/|$|\?)`)
+	applySubdomRe  = regexp.MustCompile(`(?i)^(careers|jobs|apply|recruiting)\.`)
+
 	payRangeRe          = regexp.MustCompile(`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?\s*(?:–|—|-|to\b|and\b)\s*\$?([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`)
 	singlePayRe         = regexp.MustCompile(`\$([\d,]+(?:\.\d+)?)\s*(k|K)?\+?`)
 	hourlyRe              = regexp.MustCompile(`(?i)/hr\b|/hour\b|per\s+hour\b|\bhourly`)
@@ -59,6 +71,16 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 		return models.JobDetail{}, err
 	}
 
+	applyURL := ""
+	if href, exists := doc.Find("a.topcard__link").First().Attr("href"); exists {
+		if u, err := url.Parse(href); err == nil {
+			u.RawQuery = ""
+			applyURL = u.String()
+		}
+	}
+
+	applyURL2 := parseApplyURL2(doc)
+
 	applicantsText := parseApplicantsText(doc.Text())
 	detail := models.JobDetail{
 		SourceID:       strings.TrimSpace(doc.Find("code#decoratedJobPostingId").Text()),
@@ -70,6 +92,8 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 		Applicants:          parseApplicantsCount(applicantsText),
 		ApplicantsQualifier: parseApplicantsQualifier(applicantsText),
 		Description:    strings.TrimSpace(doc.Find("div.show-more-less-html__markup").Text()),
+		ApplyURL:       applyURL,
+		ApplyURL2:      applyURL2,
 	}
 
 	doc.Find("li.description__job-criteria-item").Each(func(_ int, s *goquery.Selection) {
@@ -211,6 +235,33 @@ func parseApplicantsCount(text string) *int {
 		return nil
 	}
 	return &n
+}
+
+// parseApplyURL2 scans all links in the document for an ATS or company application URL.
+// ATS domains are checked first; URLs with apply/careers/jobs path segments are checked second.
+// LinkedIn URLs and non-absolute URLs are skipped.
+func parseApplyURL2(doc *goquery.Document) string {
+	var fallback string
+	doc.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
+		if fallback != "" {
+			return
+		}
+		href, _ := s.Attr("href")
+		u, err := url.Parse(href)
+		if err != nil || u.Host == "" || strings.Contains(u.Host, "linkedin.com") {
+			return
+		}
+		for _, ats := range atsHosts {
+			if strings.HasSuffix(u.Host, ats) {
+				fallback = href
+				return
+			}
+		}
+		if applyPathRe.MatchString(u.Path) || applySubdomRe.MatchString(u.Host) {
+			fallback = href
+		}
+	})
+	return fallback
 }
 
 // parseAmount converts a digit string and optional "k"/"K" suffix into a numeric value.
