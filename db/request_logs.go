@@ -82,7 +82,11 @@ func GetFailedSearchURLsByRunID(ctx context.Context, pool *pgxpool.Pool, runID s
 
 // InsertRequestLog records an outbound HTTP request and its outcome.
 // Errors are written to stderr rather than returned so a logging failure never interrupts a scrape.
+// A nil pool is silently ignored.
 func InsertRequestLog(ctx context.Context, pool *pgxpool.Pool, entry models.RequestLog) {
+	if pool == nil {
+		return
+	}
 	_, err := pool.Exec(ctx, `
 		INSERT INTO request_logs (
 			source, job_source_id, url, request_headers,

@@ -438,7 +438,8 @@ func processJob(
 		entry.ResponseBody = bodyStr
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return fmt.Errorf("empty response at start=%d", searchOptions.Start)
+		fmt.Printf("empty response at start=%d", searchOptions.Start)
+		return nil
 	}
 
 	db.InsertRequestLog(ctx, pool, models.RequestLog{
