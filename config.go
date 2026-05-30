@@ -17,7 +17,7 @@ type config struct {
 func parseConfig(args []string) (config, error) {
 	fs := flag.NewFlagSet("jobSearching", flag.ContinueOnError)
 	keywords := fs.String("keywords", "", "search keywords (e.g. software+engineer)")
-	timePosted := fs.String("time-posted", "", "time posted filter: r3600, r86400, r604800")
+	timePosted := fs.String("time-posted", "", "time posted filter: r<seconds> (e.g. r86400 for 24h)")
 	workType := fs.String("work-type", "", "work type: remote, onsite, hybrid")
 	jobType := fs.String("job-type", "", "job type: F, P, C, T (optional)")
 	numJobs := fs.Int("jobs", 0, "number of jobs to scrape (default 10)")
