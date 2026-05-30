@@ -71,12 +71,12 @@ const (
 	KeywordsDataEngineer     Keywords = "data+engineer"
 )
 
-type timePostedLookup string
+type TimeFilter string
 
 const (
-	OneDay  timePostedLookup = "r86400"
-	OneHr   timePostedLookup = "r3600"
-	OneWeek timePostedLookup = "r604800"
+	OneDay  TimeFilter = "r86400"
+	OneHr   TimeFilter = "r3600"
+	OneWeek TimeFilter = "r604800"
 )
 
 var workTypeValues = map[models.WorkType]int{
@@ -85,20 +85,20 @@ var workTypeValues = map[models.WorkType]int{
 	models.Hybrid: 3,
 }
 
-type jobType string
+type JobType string
 
 const (
-	FullTime  jobType = "F"
-	PartTime  jobType = "P"
-	Contract  jobType = "C"
-	Temporary jobType = "T"
+	FullTime  JobType = "F"
+	PartTime  JobType = "P"
+	Contract  JobType = "C"
+	Temporary JobType = "T"
 )
 
 type SearchOptions struct {
 	Keywords   Keywords
-	TimePosted timePostedLookup
+	TimePosted TimeFilter
 	WorkType   models.WorkType
-	JobType    jobType
+	JobType    JobType
 	Start      int
 }
 
