@@ -35,6 +35,10 @@ func testSourceID(t *testing.T) string {
 	return fmt.Sprintf("%s-%d", t.Name(), time.Now().UnixNano())
 }
 
+func testRunID(t *testing.T) string {
+	return fmt.Sprintf("run-%s-%d", t.Name(), time.Now().UnixNano())
+}
+
 func testJob(sourceID string) models.Job {
 	return models.Job{
 		Source:     models.LinkedIn,
