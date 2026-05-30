@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS request_logs (
     message         TEXT       NOT NULL,
     response_body   TEXT,
     is_issue        BOOLEAN    NOT NULL DEFAULT FALSE,
+    run_id          TEXT,
     logged_at       TIMESTAMP  NOT NULL DEFAULT NOW()
 );
 
@@ -23,6 +24,8 @@ COMMENT ON COLUMN request_logs.error            IS 'Error message if the request
 COMMENT ON COLUMN request_logs.message          IS 'Human-readable description of the outcome';
 COMMENT ON COLUMN request_logs.response_body    IS 'Full response body, only captured when is_issue is true';
 COMMENT ON COLUMN request_logs.is_issue         IS 'True when the request resulted in an error, non-200 status, or empty parse result';
+COMMENT ON COLUMN request_logs.run_id           IS 'Scrape run this request belongs to';
 
 CREATE INDEX idx_request_logs_is_issue ON request_logs (is_issue);
 CREATE INDEX idx_request_logs_source   ON request_logs (source);
+CREATE INDEX idx_request_logs_run_id   ON request_logs (run_id);

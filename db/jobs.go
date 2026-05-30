@@ -38,9 +38,9 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, job models.Job, de
 		INSERT INTO job_details (
 			job_id, source, source_id, seniority, employment_type, work_type,
 			job_function, industries, description, applicants_text, applicants, applicants_qualifier,
-			pay_type, pay_min, pay_max, pay_text, run_id
+			pay_type, pay_min, pay_max, pay_text, apply_url, run_id
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		ON CONFLICT (job_id) DO UPDATE SET
 			applicants_text = EXCLUDED.applicants_text,
 			applicants = EXCLUDED.applicants,
@@ -65,6 +65,7 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, job models.Job, de
 		detail.PayMin,
 		detail.PayMax,
 		nullableString(detail.PayText),
+		nullableString(detail.ApplyURL),
 		job.RunID,
 	)
 	return err

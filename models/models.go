@@ -90,5 +90,6 @@ type JobDetail struct {
 	PayMin              *float64
 	PayMax              *float64
 	PayText             string
+	ApplyURL            string
 	RunID               string
 }

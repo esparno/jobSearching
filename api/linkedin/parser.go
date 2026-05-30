@@ -1,6 +1,7 @@
 package linkedin
 
 import (
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -59,6 +60,14 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 		return models.JobDetail{}, err
 	}
 
+	applyURL := ""
+	if href, exists := doc.Find("a.topcard__link").First().Attr("href"); exists {
+		if u, err := url.Parse(href); err == nil {
+			u.RawQuery = ""
+			applyURL = u.String()
+		}
+	}
+
 	applicantsText := parseApplicantsText(doc.Text())
 	detail := models.JobDetail{
 		SourceID:       strings.TrimSpace(doc.Find("code#decoratedJobPostingId").Text()),
@@ -70,6 +79,7 @@ func ParseJobDetail(html string) (models.JobDetail, error) {
 		Applicants:          parseApplicantsCount(applicantsText),
 		ApplicantsQualifier: parseApplicantsQualifier(applicantsText),
 		Description:    strings.TrimSpace(doc.Find("div.show-more-less-html__markup").Text()),
+		ApplyURL:       applyURL,
 	}
 
 	doc.Find("li.description__job-criteria-item").Each(func(_ int, s *goquery.Selection) {

@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS job_details (
     pay_min         NUMERIC,
     pay_max         NUMERIC,
     pay_text        TEXT,
+    apply_url       TEXT,
     description_tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', COALESCE(description, ''))) STORED,
     fetched_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     UNIQUE (job_id),
@@ -65,6 +66,7 @@ COMMENT ON COLUMN job_details.pay_type        IS 'Pay frequency e.g. hourly, sal
 COMMENT ON COLUMN job_details.pay_min         IS 'Lower bound of the pay range if provided';
 COMMENT ON COLUMN job_details.pay_max         IS 'Upper bound of the pay range if provided';
 COMMENT ON COLUMN job_details.pay_text        IS 'Raw pay text as scraped, for reference and future parsing';
+COMMENT ON COLUMN job_details.apply_url       IS 'URL to apply for the job (LinkedIn job URL for LinkedIn source)';
 COMMENT ON COLUMN job_details.description_tsv  IS 'Auto-generated tsvector of description for full text search';
 COMMENT ON CONSTRAINT job_details_job_id_key ON job_details IS 'Each job can only have one detail record';
 COMMENT ON COLUMN job_details.fetched_at       IS 'Timestamp when the job details were fetched';

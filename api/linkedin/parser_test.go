@@ -64,6 +64,7 @@ func TestParseJobs_Empty(t *testing.T) {
 
 const detailHTML = `
 <h2 class="top-card-layout__title">Backend Engineer</h2>
+<a class="topcard__link" href="https://www.linkedin.com/jobs/view/backend-engineer-at-techco-999?trk=public_jobs_topcard-title">Backend Engineer</a>
 <a class="topcard__org-name-link">TechCo</a>
 <span class="topcard__flavor--bullet">San Francisco, CA</span>
 <span class="posted-time-ago__text">3 days ago</span>
@@ -123,6 +124,9 @@ func TestParseJobDetail(t *testing.T) {
 	}
 	if detail.Description == "" {
 		t.Error("Description should not be empty")
+	}
+	if detail.ApplyURL != "https://www.linkedin.com/jobs/view/backend-engineer-at-techco-999" {
+		t.Errorf("ApplyURL: got %q, want %q", detail.ApplyURL, "https://www.linkedin.com/jobs/view/backend-engineer-at-techco-999")
 	}
 	if detail.ApplicantsText != "142 applicants" {
 		t.Errorf("ApplicantsText: got %q, want %q", detail.ApplicantsText, "142 applicants")
