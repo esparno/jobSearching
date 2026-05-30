@@ -189,19 +189,28 @@ const (
 	macroBreakMax   = 2 * time.Minute
 )
 
-var requestCount atomic.Int64
+var (
+	requestCount atomic.Int64
+	macroMu      sync.RWMutex
+)
 
 // randomDelay sleeps for minDelay plus a random jitter to avoid rate limiting.
 // Every macroBreakEvery calls it pauses for a longer macro-break instead.
+// All workers hold a read lock during their delay; the macro-break goroutine
+// acquires the write lock, which blocks new requests until the pause completes.
 func randomDelay() {
 	n := requestCount.Add(1)
 	if n%macroBreakEvery == 0 {
+		macroMu.Lock()
 		pause := macroBreakMin + time.Duration(rand.Int63n(int64(macroBreakMax-macroBreakMin)))
 		log.Printf("macro-break: pausing %s after %d requests", pause.Round(time.Second), n)
 		time.Sleep(pause)
+		macroMu.Unlock()
 		return
 	}
+	macroMu.RLock()
 	time.Sleep(minDelay + time.Duration(rand.Int63n(int64(maxJitter))))
+	macroMu.RUnlock()
 }
 
 // ScrapeJobs paginates through up to numberOfJobs listings, fetches detail pages for new ones,
