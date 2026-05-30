@@ -406,8 +406,10 @@ func processJob(
 	}
 
 	statusCode := resp.StatusCode
-	baseLog.RequestHeaders = headersToJSON(resp.Request.Header)
 	baseLog.StatusCode = &statusCode
+	if resp.Request != nil {
+		baseLog.RequestHeaders = headersToJSON(resp.Request.Header)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
@@ -438,7 +440,7 @@ func processJob(
 		entry.ResponseBody = bodyStr
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		fmt.Printf("empty response at start=%d", searchOptions.Start)
+		log.Printf("empty response at start=%d", searchOptions.Start)
 		return nil
 	}
 

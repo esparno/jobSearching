@@ -270,6 +270,7 @@ func TestProcessJob_EmptyPage(t *testing.T) {
 	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
 
 	err := processJob(context.Background(), nil, opts, &found, "run-1")
+
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
