@@ -67,8 +67,7 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, job models.Job, de
 // GetNewJobsByRunID returns all jobs inserted during the given run that do not yet have a detail record.
 func GetNewJobsByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([]models.Job, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT j.id, j.source, j.source_id, j.title, j.company, j.location, j.url,
-		       COALESCE(j.posted_date::text, ''), j.run_id
+		SELECT j.id, j.source, j.source_id, j.run_id
 		FROM jobs j
 		LEFT JOIN job_details jd ON jd.job_id = j.id
 		WHERE j.run_id = $1
@@ -81,30 +80,9 @@ func GetNewJobsByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([
 
 	var jobs []models.Job
 	for rows.Next() {
-		var (
-			job                                        models.Job
-			title, company, location, url, postedDate *string
-		)
-		if err := rows.Scan(
-			&job.ID, &job.Source, &job.SourceID,
-			&title, &company, &location, &url, &postedDate, &job.RunID,
-		); err != nil {
+		var job models.Job
+		if err := rows.Scan(&job.ID, &job.Source, &job.SourceID, &job.RunID); err != nil {
 			return nil, err
-		}
-		if title != nil {
-			job.Title = *title
-		}
-		if company != nil {
-			job.Company = *company
-		}
-		if location != nil {
-			job.Location = *location
-		}
-		if url != nil {
-			job.URL = *url
-		}
-		if postedDate != nil {
-			job.PostedDate = *postedDate
 		}
 		jobs = append(jobs, job)
 	}

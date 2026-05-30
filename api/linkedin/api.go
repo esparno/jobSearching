@@ -271,7 +271,7 @@ func processAllJobDetails(
 				return
 			}
 			saved.Add(1)
-			log.Printf("saved: %s | %s | %s", job.SourceID, job.Title, job.Company)
+			log.Printf("saved: %s", job.SourceID)
 		}()
 	}
 	wg.Wait()
@@ -313,7 +313,7 @@ func retryFailedJobDetails(
 			}
 			skipped.Add(-1)
 			saved.Add(1)
-			log.Printf("retry saved: %s | %s | %s", job.SourceID, job.Title, job.Company)
+			log.Printf("retry saved: %s", job.SourceID)
 		}()
 	}
 	wg.Wait()
@@ -444,14 +444,9 @@ func processJob(
 		return nil
 	}
 
-	db.InsertRequestLog(ctx, pool, models.RequestLog{
-		Source:         baseLog.Source,
-		URL:            baseLog.URL,
-		RequestHeaders: baseLog.RequestHeaders,
-		StatusCode:     baseLog.StatusCode,
-		Message:        "ok",
-		RunID:          runId,
-	})
+	entry := baseLog
+	entry.Message = "ok"
+	db.InsertRequestLog(ctx, pool, entry)
 
 	found.Add(int64(len(jobs)))
 	log.Printf("page start=%d: found %d jobs", searchOptions.Start, len(jobs))

@@ -11,8 +11,7 @@ import (
 // request log entry and still lack a job_details record.
 func GetFailedJobsByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([]models.Job, error) {
 	rows, err := pool.Query(ctx, `
-		SELECT DISTINCT j.id, j.source, j.source_id, j.title, j.company, j.location, j.url,
-		       COALESCE(j.posted_date::text, ''), j.run_id
+		SELECT DISTINCT j.id, j.source, j.source_id, j.run_id
 		FROM jobs j
 		JOIN request_logs rl ON rl.job_source_id = j.source_id AND rl.source = j.source
 		WHERE rl.run_id = $1
@@ -26,30 +25,9 @@ func GetFailedJobsByRunID(ctx context.Context, pool *pgxpool.Pool, runID string)
 
 	var jobs []models.Job
 	for rows.Next() {
-		var (
-			job                                        models.Job
-			title, company, location, url, postedDate *string
-		)
-		if err := rows.Scan(
-			&job.ID, &job.Source, &job.SourceID,
-			&title, &company, &location, &url, &postedDate, &job.RunID,
-		); err != nil {
+		var job models.Job
+		if err := rows.Scan(&job.ID, &job.Source, &job.SourceID, &job.RunID); err != nil {
 			return nil, err
-		}
-		if title != nil {
-			job.Title = *title
-		}
-		if company != nil {
-			job.Company = *company
-		}
-		if location != nil {
-			job.Location = *location
-		}
-		if url != nil {
-			job.URL = *url
-		}
-		if postedDate != nil {
-			job.PostedDate = *postedDate
 		}
 		jobs = append(jobs, job)
 	}
