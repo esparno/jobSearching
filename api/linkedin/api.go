@@ -280,7 +280,7 @@ func processAllJobs(ctx context.Context,
 	opts SearchOptions, numberOfJobs int, found *atomic.Int64, runId string) {
 	wg := sync.WaitGroup{}
 	sem := make(chan struct{}, numWorkers)
-	for i := opts.Start; i < numberOfJobs; i += 10 {
+	for i := opts.Start; i < (opts.Start + numberOfJobs); i += 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
