@@ -41,7 +41,13 @@ func InsertJobDetail(ctx context.Context, pool *pgxpool.Pool, job models.Job, de
 			pay_type, pay_min, pay_max, pay_text, run_id
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-		ON CONFLICT (job_id) DO NOTHING
+		ON CONFLICT (job_id) DO UPDATE SET
+			applicants_text = EXCLUDED.applicants_text,
+			applicants = EXCLUDED.applicants,
+			applicants_qualifier = EXCLUDED.applicants_qualifier,
+			run_id = EXCLUDED.run_id
+		WHERE job_details.run_id != EXCLUDED.run_id
+		AND (job_details.applicants IS NULL OR job_details.applicants < 200)
 	`,
 		job.ID,
 		job.Source,
