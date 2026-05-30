@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -36,7 +37,7 @@ func testSourceID(t *testing.T) string {
 }
 
 func testRunID(t *testing.T) string {
-	return fmt.Sprintf("run-%s-%d", t.Name(), time.Now().UnixNano())
+	return uuid.New().String()
 }
 
 func testJob(sourceID string) models.Job {

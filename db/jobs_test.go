@@ -164,37 +164,167 @@ func TestInsertJobDetail(t *testing.T) {
 	}
 }
 
-func TestInsertJobDetail_Idempotent(t *testing.T) {
+func TestInsertJobDetail_SkipsApplicantsWithinSameRun(t *testing.T) {
 	pool := connectTestDB(t)
 	ctx := context.Background()
 	sourceID := testSourceID(t)
+	runID := testRunID(t)
 	t.Cleanup(func() {
 		_, _ = pool.Exec(ctx, "DELETE FROM job_details WHERE source_id = $1", sourceID)
 		_, _ = pool.Exec(ctx, "DELETE FROM jobs WHERE source_id = $1", sourceID)
 	})
 
 	job := testJob(sourceID)
+	job.RunID = runID
 	id, _, err := UpsertJob(ctx, pool, job)
 	if err != nil {
 		t.Fatalf("UpsertJob: %v", err)
 	}
 	job.ID = id
 
-	first := models.JobDetail{SourceID: sourceID, Description: "First"}
+	firstCount := 53
+	first := models.JobDetail{
+		SourceID:            sourceID,
+		Description:         "First",
+		ApplicantsText:      "53 applicants",
+		Applicants:          &firstCount,
+		ApplicantsQualifier: models.ApplicantsEqual,
+	}
 	if err := InsertJobDetail(ctx, pool, job, first); err != nil {
 		t.Fatalf("first InsertJobDetail: %v", err)
 	}
 
-	// Second insert should be silently ignored (ON CONFLICT DO NOTHING).
-	second := models.JobDetail{SourceID: sourceID, Description: "Second"}
+	secondCount := 100
+	second := models.JobDetail{
+		SourceID:            sourceID,
+		Description:         "Second",
+		ApplicantsText:      "100 applicants",
+		Applicants:          &secondCount,
+		ApplicantsQualifier: models.ApplicantsEqual,
+	}
 	if err := InsertJobDetail(ctx, pool, job, second); err != nil {
 		t.Fatalf("second InsertJobDetail: %v", err)
 	}
 
 	var desc string
-	_ = pool.QueryRow(ctx, "SELECT description FROM job_details WHERE source_id = $1", sourceID).Scan(&desc)
+	var applicants int
+	_ = pool.QueryRow(ctx, "SELECT description, applicants FROM job_details WHERE source_id = $1", sourceID).Scan(&desc, &applicants)
 	if desc != "First" {
-		t.Errorf("description: got %q, want %q (first insert should be preserved)", desc, "First")
+		t.Errorf("description: got %q, want %q (should be preserved)", desc, "First")
+	}
+	if applicants != firstCount {
+		t.Errorf("applicants: got %d, want %d (should not update within same run)", applicants, firstCount)
+	}
+}
+
+func TestInsertJobDetail_UpdatesApplicantsOnRerun(t *testing.T) {
+	pool := connectTestDB(t)
+	ctx := context.Background()
+	sourceID := testSourceID(t)
+	runID1 := testRunID(t)
+	runID2 := testRunID(t)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM job_details WHERE source_id = $1", sourceID)
+		_, _ = pool.Exec(ctx, "DELETE FROM jobs WHERE source_id = $1", sourceID)
+	})
+
+	job := testJob(sourceID)
+	job.RunID = runID1
+	id, _, err := UpsertJob(ctx, pool, job)
+	if err != nil {
+		t.Fatalf("UpsertJob: %v", err)
+	}
+	job.ID = id
+
+	firstCount := 53
+	first := models.JobDetail{
+		SourceID:            sourceID,
+		Description:         "First",
+		ApplicantsText:      "53 applicants",
+		Applicants:          &firstCount,
+		ApplicantsQualifier: models.ApplicantsEqual,
+	}
+	if err := InsertJobDetail(ctx, pool, job, first); err != nil {
+		t.Fatalf("first InsertJobDetail: %v", err)
+	}
+
+	job.RunID = runID2
+	secondCount := 100
+	second := models.JobDetail{
+		SourceID:            sourceID,
+		Description:         "Second",
+		ApplicantsText:      "100 applicants",
+		Applicants:          &secondCount,
+		ApplicantsQualifier: models.ApplicantsEqual,
+	}
+	if err := InsertJobDetail(ctx, pool, job, second); err != nil {
+		t.Fatalf("second InsertJobDetail: %v", err)
+	}
+
+	var desc, applicantsText string
+	var applicants int
+	_ = pool.QueryRow(ctx, `
+		SELECT description, applicants, applicants_text FROM job_details WHERE source_id = $1
+	`, sourceID).Scan(&desc, &applicants, &applicantsText)
+	if desc != "First" {
+		t.Errorf("description: got %q, want %q (should be preserved on rerun)", desc, "First")
+	}
+	if applicants != secondCount {
+		t.Errorf("applicants: got %d, want %d (should update on rerun)", applicants, secondCount)
+	}
+	if applicantsText != second.ApplicantsText {
+		t.Errorf("applicants_text: got %q, want %q (should update on rerun)", applicantsText, second.ApplicantsText)
+	}
+}
+
+func TestInsertJobDetail_SkipsApplicantsWhenAtOrAbove200(t *testing.T) {
+	pool := connectTestDB(t)
+	ctx := context.Background()
+	sourceID := testSourceID(t)
+	runID1 := testRunID(t)
+	runID2 := testRunID(t)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM job_details WHERE source_id = $1", sourceID)
+		_, _ = pool.Exec(ctx, "DELETE FROM jobs WHERE source_id = $1", sourceID)
+	})
+
+	job := testJob(sourceID)
+	job.RunID = runID1
+	id, _, err := UpsertJob(ctx, pool, job)
+	if err != nil {
+		t.Fatalf("UpsertJob: %v", err)
+	}
+	job.ID = id
+
+	firstCount := 200
+	first := models.JobDetail{
+		SourceID:            sourceID,
+		Description:         "First",
+		ApplicantsText:      "200 applicants",
+		Applicants:          &firstCount,
+		ApplicantsQualifier: models.ApplicantsEqual,
+	}
+	if err := InsertJobDetail(ctx, pool, job, first); err != nil {
+		t.Fatalf("first InsertJobDetail: %v", err)
+	}
+
+	job.RunID = runID2
+	secondCount := 250
+	second := models.JobDetail{
+		SourceID:            sourceID,
+		Description:         "Second",
+		ApplicantsText:      "250 applicants",
+		Applicants:          &secondCount,
+		ApplicantsQualifier: models.ApplicantsEqual,
+	}
+	if err := InsertJobDetail(ctx, pool, job, second); err != nil {
+		t.Fatalf("second InsertJobDetail: %v", err)
+	}
+
+	var applicants int
+	_ = pool.QueryRow(ctx, "SELECT applicants FROM job_details WHERE source_id = $1", sourceID).Scan(&applicants)
+	if applicants != firstCount {
+		t.Errorf("applicants: got %d, want %d (should not update when already >= 200)", applicants, firstCount)
 	}
 }
 
