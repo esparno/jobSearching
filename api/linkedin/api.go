@@ -123,7 +123,8 @@ func getUrl(ctx context.Context, url string) (*http.Response, error) {
 	return resp.Response, nil
 }
 
-// buildSearchURL constructs the LinkedIn job search URL for the given options.
+// buildSearchURL constructs the full LinkedIn job search URL for the given options,
+// including all query parameters. Used by SearchJobs and for request logging.
 func buildSearchURL(opts SearchOptions) string {
 	base := "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
 	params := url.Values{}
