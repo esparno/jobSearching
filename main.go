@@ -4,14 +4,19 @@ import (
 	"context"
 	"jobSearching/api/linkedin"
 	"jobSearching/db"
-	"jobSearching/models"
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	_ = godotenv.Load(".env.local")
+
+	cfg, err := parseConfig(os.Args[1:])
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err := linkedin.Configure(); err != nil {
 		log.Fatal(err)
@@ -25,9 +30,5 @@ func main() {
 	}
 	defer pool.Close()
 
-	linkedin.ScrapeJobs(ctx, 10, linkedin.SearchOptions{
-		Keywords:   linkedin.KeywordsSoftwareEngineer,
-		TimePosted: linkedin.OneDay,
-		WorkType:   models.Remote,
-	}, pool)
+	linkedin.ScrapeJobs(ctx, cfg.numJobs, cfg.opts, pool)
 }
