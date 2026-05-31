@@ -113,9 +113,12 @@ type SearchOptions struct {
 
 const jobPostingBaseURL = "https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/"
 
+// delayFn is the function called before every outbound request. Tests replace it with a no-op.
+var delayFn func() = randomDelay
+
 // getUrl applies a random delay then performs a GET request, returning the underlying *http.Response.
 func getUrl(ctx context.Context, url string) (*http.Response, error) {
-	randomDelay()
+	delayFn()
 	resp, err := httpClient.R().SetContext(ctx).Get(url)
 	if err != nil {
 		return nil, err

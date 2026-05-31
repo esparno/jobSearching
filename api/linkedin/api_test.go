@@ -3,6 +3,7 @@ package linkedin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"jobSearching/models"
 	"net/http"
@@ -24,6 +25,25 @@ func mockResponse(status int, body string) *http.Response {
 		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
+}
+
+// disableDelays replaces delayFn with a no-op for the duration of the test.
+func disableDelays(t *testing.T) {
+	t.Helper()
+	orig := delayFn
+	delayFn = func() {}
+	t.Cleanup(func() { delayFn = orig })
+}
+
+// jobSearchHTML returns minimal HTML containing one parseable job card.
+func jobSearchHTML(sourceID string) string {
+	return fmt.Sprintf(`<div class="job-search-card" data-entity-urn="urn:li:jobPosting:%s">
+		<a class="base-card__full-link" href="https://linkedin.com/jobs/view/%s"></a>
+		<h3 class="base-search-card__title">Software Engineer</h3>
+		<h4 class="base-search-card__subtitle"><a>Acme Corp</a></h4>
+		<span class="job-search-card__location">Remote</span>
+		<time datetime="2026-05-01"></time>
+	</div>`, sourceID, sourceID)
 }
 
 // swapHTTPClient replaces the package-level httpClient and restores it after the test.
@@ -279,6 +299,81 @@ func TestProcessJob_EmptyPage(t *testing.T) {
 	}
 	if found.Load() != 0 {
 		t.Errorf("found: got %d, want 0", found.Load())
+	}
+}
+
+func TestProcessAllJobs_StopsAfterConsecutiveEmpties(t *testing.T) {
+	disableDelays(t)
+	var requests atomic.Int32
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		requests.Add(1)
+		return mockResponse(200, ""), nil
+	})
+
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+	processAllJobs(context.Background(), nil, opts, 100, new(atomic.Int64), "run-1")
+
+	if int(requests.Load()) != maxConsecutiveEmpties {
+		t.Errorf("requests: got %d, want %d", requests.Load(), maxConsecutiveEmpties)
+	}
+}
+
+func TestProcessAllJobs_ResetsConsecutiveEmptiesOnResults(t *testing.T) {
+	disableDelays(t)
+	var requests atomic.Int32
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		n := requests.Add(1)
+		if n <= 2 {
+			return mockResponse(200, jobSearchHTML(fmt.Sprintf("job-%d", n))), nil
+		}
+		return mockResponse(200, ""), nil
+	})
+
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+	processAllJobs(context.Background(), nil, opts, 100, new(atomic.Int64), "run-1")
+
+	want := int32(2 + maxConsecutiveEmpties)
+	if requests.Load() != want {
+		t.Errorf("requests: got %d, want %d", requests.Load(), want)
+	}
+}
+
+func TestProcessAllJobs_ProcessesInOrder(t *testing.T) {
+	disableDelays(t)
+	var starts []string
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		starts = append(starts, r.URL.Query().Get("start"))
+		return mockResponse(200, ""), nil
+	})
+
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+	processAllJobs(context.Background(), nil, opts, 100, new(atomic.Int64), "run-1")
+
+	for i := 1; i < len(starts); i++ {
+		if starts[i] <= starts[i-1] {
+			t.Errorf("out of order at index %d: %q after %q", i, starts[i], starts[i-1])
+		}
+	}
+}
+
+func TestProcessAllJobs_ErrorResetsConsecutiveEmpties(t *testing.T) {
+	disableDelays(t)
+	var requests atomic.Int32
+	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
+		n := requests.Add(1)
+		if n == 3 {
+			return nil, errors.New("connection refused")
+		}
+		return mockResponse(200, ""), nil
+	})
+
+	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
+	processAllJobs(context.Background(), nil, opts, 100, new(atomic.Int64), "run-1")
+
+	// 2 empties → error resets to 0 → 5 more empties = 8 total
+	want := int32(2 + 1 + maxConsecutiveEmpties)
+	if requests.Load() != want {
+		t.Errorf("requests: got %d, want %d", requests.Load(), want)
 	}
 }
 
