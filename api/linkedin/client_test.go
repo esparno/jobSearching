@@ -37,6 +37,7 @@ func TestConfigure_SetsProxy(t *testing.T) {
 }
 
 func TestAcceptLanguageHeader(t *testing.T) {
+	disableDelays(t)
 	var gotLang string
 	orig := httpClient
 	httpClient = cloneWithTransport(func(r *http.Request) (*http.Response, error) {
@@ -83,6 +84,7 @@ func TestShuffleHeaderOrder(t *testing.T) {
 }
 
 func TestNoCookieForwarding(t *testing.T) {
+	disableDelays(t)
 	callN := 0
 	var secondReqCookies []*http.Cookie
 

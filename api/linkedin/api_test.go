@@ -133,6 +133,7 @@ func TestSearchJobs_InvalidOptions(t *testing.T) {
 }
 
 func TestSearchJobs_URLParams(t *testing.T) {
+	disableDelays(t)
 	var gotURL string
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
 		gotURL = r.URL.String()
@@ -172,6 +173,7 @@ func TestSearchJobs_URLParams(t *testing.T) {
 }
 
 func TestSearchJobs_NoJobType(t *testing.T) {
+	disableDelays(t)
 	var gotURL string
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
 		gotURL = r.URL.String()
@@ -195,6 +197,7 @@ func TestSearchJobs_NoJobType(t *testing.T) {
 }
 
 func TestSearchJobs_NetworkError(t *testing.T) {
+	disableDelays(t)
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("connection refused")
 	})
@@ -212,6 +215,7 @@ func TestSearchJobs_NetworkError(t *testing.T) {
 }
 
 func TestSearchJobId_URL(t *testing.T) {
+	disableDelays(t)
 	var gotURL string
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
 		gotURL = r.URL.String()
@@ -231,6 +235,7 @@ func TestSearchJobId_URL(t *testing.T) {
 }
 
 func TestSearchJobId_NetworkError(t *testing.T) {
+	disableDelays(t)
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("connection refused")
 	})
@@ -265,6 +270,7 @@ var headersToJSONTests = []struct {
 }
 
 func TestProcessJob_NetworkError(t *testing.T) {
+	disableDelays(t)
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("connection refused")
 	})
@@ -282,6 +288,7 @@ func TestProcessJob_NetworkError(t *testing.T) {
 }
 
 func TestProcessJob_EmptyPage(t *testing.T) {
+	disableDelays(t)
 	swapHTTPClient(t, func(r *http.Request) (*http.Response, error) {
 		return mockResponse(200, ""), nil
 	})
