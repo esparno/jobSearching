@@ -203,6 +203,7 @@ var (
 // wait out any active macro-break), then sleep independently so concurrent workers don't
 // serialize. Macro-breaks hold the write lock for the full pause duration.
 func randomDelay() {
+	time.Sleep(minDelay + time.Duration(rand.Int63n(int64(maxJitter))))
 	n := requestCount.Add(1)
 	if n%macroBreakEvery == 0 {
 		delayMu.Lock()
@@ -214,7 +215,6 @@ func randomDelay() {
 	}
 	delayMu.RLock()
 	delayMu.RUnlock()
-	time.Sleep(minDelay + time.Duration(rand.Int63n(int64(maxJitter))))
 }
 
 // ScrapeJobs paginates through up to numberOfJobs listings, fetches detail pages for new ones,
