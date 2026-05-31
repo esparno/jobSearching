@@ -252,7 +252,7 @@ func TestProcessJob_NetworkError(t *testing.T) {
 	var found atomic.Int64
 	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
 
-	err := processJob(context.Background(), nil, opts, &found, "run-1")
+	_, err := processJob(context.Background(), nil, opts, &found, "run-1")
 	if err == nil {
 		t.Error("expected error on network failure, got nil")
 	}
@@ -269,10 +269,13 @@ func TestProcessJob_EmptyPage(t *testing.T) {
 	var found atomic.Int64
 	opts := SearchOptions{Keywords: KeywordsSoftwareEngineer, TimePosted: OneDay, WorkType: models.Remote}
 
-	err := processJob(context.Background(), nil, opts, &found, "run-1")
+	n, err := processJob(context.Background(), nil, opts, &found, "run-1")
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("n: got %d, want 0", n)
 	}
 	if found.Load() != 0 {
 		t.Errorf("found: got %d, want 0", found.Load())

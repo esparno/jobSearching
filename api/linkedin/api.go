@@ -181,12 +181,13 @@ func headersToJSON(h http.Header) string {
 }
 
 const (
-	numWorkers      = 5
-	minDelay        = 3 * time.Second
-	maxJitter       = 7 * time.Second
-	macroBreakEvery = 200
-	macroBreakMin   = time.Minute
-	macroBreakMax   = 2 * time.Minute
+	numWorkers            = 5
+	minDelay              = 3 * time.Second
+	maxJitter             = 7 * time.Second
+	macroBreakEvery       = 200
+	macroBreakMin         = time.Minute
+	macroBreakMax         = 2 * time.Minute
+	maxConsecutiveEmpties = 5
 )
 
 var (
@@ -350,31 +351,38 @@ func processApplicantUpdates(ctx context.Context, pool *pgxpool.Pool, workType m
 
 			if err := processJobDetail(ctx, pool, job, workType); err != nil {
 				log.Printf("failed to update applicants for job %s: %v", job.SourceID, err)
+			} else {
+				log.Printf("applicants updated: %s", job.SourceID)
 			}
 		}()
 	}
 	wg.Wait()
 }
 
-// processAllJobs concurrently fetches all search result pages up to numberOfJobs
-// and upserts each discovered listing into the database tagged with runId.
+// processAllJobs fetches search result pages in order, stopping early once
+// maxConsecutiveEmpties pages in a row return no results.
 func processAllJobs(ctx context.Context,
 	pool *pgxpool.Pool,
 	opts SearchOptions, numberOfJobs int, found *atomic.Int64, runId string) {
-	wg := sync.WaitGroup{}
-	sem := make(chan struct{}, numWorkers)
+	consecutiveEmpties := 0
 	for i := opts.Start; i < (opts.Start + numberOfJobs); i += 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			searchOptions := opts
-			searchOptions.Start = i
-			_ = processJob(ctx, pool, searchOptions, found, runId)
-		}()
+		searchOptions := opts
+		searchOptions.Start = i
+		n, err := processJob(ctx, pool, searchOptions, found, runId)
+		if err != nil {
+			consecutiveEmpties = 0
+			continue
+		}
+		if n == 0 {
+			consecutiveEmpties++
+			if consecutiveEmpties >= maxConsecutiveEmpties {
+				log.Printf("stopping search: %d consecutive empty pages at start=%d", consecutiveEmpties, i)
+				break
+			}
+		} else {
+			consecutiveEmpties = 0
+		}
 	}
-	wg.Wait()
 }
 
 // retryFailedJobs looks up search pages from the run that had is_issue=true request log entries
@@ -411,7 +419,7 @@ func retryFailedJobs(ctx context.Context, pool *pgxpool.Pool, opts SearchOptions
 			}
 			searchOptions := opts
 			searchOptions.Start = offset
-			if err := processJob(ctx, pool, searchOptions, found, runId); err != nil {
+			if _, err := processJob(ctx, pool, searchOptions, found, runId); err != nil {
 				log.Printf("retry failed for job page at start=%d: %v", offset, err)
 			}
 		}()
@@ -420,10 +428,10 @@ func retryFailedJobs(ctx context.Context, pool *pgxpool.Pool, opts SearchOptions
 }
 
 // processJob fetches one search result page, parses the listings, and upserts each
-// into the database. found is incremented by the number of jobs returned by LinkedIn.
+// into the database. Returns the number of jobs found and any error.
 func processJob(
 	ctx context.Context, pool *pgxpool.Pool,
-	searchOptions SearchOptions, found *atomic.Int64, runId string) error {
+	searchOptions SearchOptions, found *atomic.Int64, runId string) (int, error) {
 	searchURL := buildSearchURL(searchOptions)
 	baseLog := models.RequestLog{
 		Source:         models.LinkedIn,
@@ -439,7 +447,7 @@ func processJob(
 		entry.Message = "network error fetching search page"
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return err
+		return 0, err
 	}
 
 	statusCode := resp.StatusCode
@@ -456,7 +464,7 @@ func processJob(
 		entry.Message = "failed to read search page body"
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return err
+		return 0, err
 	}
 	bodyStr := string(body)
 
@@ -468,7 +476,7 @@ func processJob(
 		entry.ResponseBody = bodyStr
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
-		return err
+		return 0, err
 	}
 
 	if len(jobs) == 0 {
@@ -478,7 +486,7 @@ func processJob(
 		entry.IsIssue = true
 		db.InsertRequestLog(ctx, pool, entry)
 		log.Printf("empty response at start=%d", searchOptions.Start)
-		return nil
+		return 0, nil
 	}
 
 	entry := baseLog
@@ -495,7 +503,7 @@ func processJob(
 		}
 	}
 
-	return nil
+	return len(jobs), nil
 }
 
 // processJobDetail fetches and saves the detail page for a job that was discovered in the
