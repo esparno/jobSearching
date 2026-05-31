@@ -97,14 +97,16 @@ func GetNewJobsByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([
 	return jobs, rows.Err()
 }
 
-// GetJobsForApplicantUpdateByRunID returns jobs from the current run that already have a
-// detail record but whose applicant count is still below the 200-applicant cap.
+// GetJobsForApplicantUpdateByRunID returns jobs seen in the current run whose detail record
+// was written in a previous run and still has an applicant count below the 200-applicant cap.
+// Jobs whose details were already fetched this run are excluded.
 func GetJobsForApplicantUpdateByRunID(ctx context.Context, pool *pgxpool.Pool, runID string) ([]models.Job, error) {
 	rows, err := pool.Query(ctx, `
 		SELECT j.id, j.source, j.source_id, j.run_id
 		FROM jobs j
 		JOIN job_details jd ON jd.job_id = j.id
 		WHERE j.run_id = $1
+		AND jd.run_id != $1
 		AND (jd.applicants IS NULL OR jd.applicants < 200)
 	`, runID)
 	if err != nil {

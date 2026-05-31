@@ -189,12 +189,18 @@ const (
 	macroBreakMax   = 2 * time.Minute
 )
 
-var requestCount atomic.Int64
+var (
+	requestCount atomic.Int64
+	delayMu      sync.Mutex
+)
 
-// randomDelay sleeps for minDelay plus a random jitter to avoid rate limiting.
-// Every macroBreakEvery calls it pauses for a longer macro-break instead.
+// randomDelay serialises all outbound requests behind a mutex so they fire
+// one at a time with a random gap. Every macroBreakEvery calls it holds the
+// lock for a longer macro-break, which blocks all workers until it completes.
 func randomDelay() {
 	n := requestCount.Add(1)
+	delayMu.Lock()
+	defer delayMu.Unlock()
 	if n%macroBreakEvery == 0 {
 		pause := macroBreakMin + time.Duration(rand.Int63n(int64(macroBreakMax-macroBreakMin)))
 		log.Printf("macro-break: pausing %s after %d requests", pause.Round(time.Second), n)

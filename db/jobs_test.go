@@ -328,6 +328,65 @@ func TestInsertJobDetail_SkipsApplicantsWhenAtOrAbove200(t *testing.T) {
 	}
 }
 
+func TestGetJobsForApplicantUpdate_ExcludesCurrentRunDetails(t *testing.T) {
+	pool := connectTestDB(t)
+	ctx := context.Background()
+	runID := testRunID(t)
+
+	// Job detailed in the current run — should be excluded.
+	sameRunID := testSourceID(t)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM job_details WHERE source_id = $1", sameRunID)
+		_, _ = pool.Exec(ctx, "DELETE FROM jobs WHERE source_id = $1", sameRunID)
+	})
+	job := testJob(sameRunID)
+	job.RunID = runID
+	id, _, _ := UpsertJob(ctx, pool, job)
+	job.ID = id
+	count := 50
+	_ = InsertJobDetail(ctx, pool, job, models.JobDetail{
+		SourceID:   sameRunID,
+		Applicants: &count,
+	})
+
+	// Job seen again this run but detailed in a previous run — should be included.
+	prevRunID := testSourceID(t)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, "DELETE FROM job_details WHERE source_id = $1", prevRunID)
+		_, _ = pool.Exec(ctx, "DELETE FROM jobs WHERE source_id = $1", prevRunID)
+	})
+	oldJob := testJob(prevRunID)
+	oldJob.RunID = testRunID(t)
+	oldID, _, _ := UpsertJob(ctx, pool, oldJob)
+	oldJob.ID = oldID
+	_ = InsertJobDetail(ctx, pool, oldJob, models.JobDetail{
+		SourceID:   prevRunID,
+		Applicants: &count,
+	})
+	oldJob.RunID = runID
+	_, _, _ = UpsertJob(ctx, pool, oldJob)
+
+	jobs, err := GetJobsForApplicantUpdateByRunID(ctx, pool, runID)
+	if err != nil {
+		t.Fatalf("GetJobsForApplicantUpdateByRunID: %v", err)
+	}
+
+	for _, j := range jobs {
+		if j.SourceID == sameRunID {
+			t.Error("job detailed in current run should not be returned for applicant update")
+		}
+	}
+	found := false
+	for _, j := range jobs {
+		if j.SourceID == prevRunID {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("job detailed in previous run should be returned for applicant update")
+	}
+}
+
 func TestInsertJobDetail_NullPayFields(t *testing.T) {
 	pool := connectTestDB(t)
 	ctx := context.Background()

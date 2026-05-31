@@ -13,6 +13,7 @@ func TestParseConfig_Flags(t *testing.T) {
 		"--work-type=hybrid",
 		"--job-type=C",
 		"--jobs=20",
+		"--start=50",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -33,6 +34,9 @@ func TestParseConfig_Flags(t *testing.T) {
 	if cfg.numJobs != 20 {
 		t.Errorf("numJobs: got %d, want %d", cfg.numJobs, 20)
 	}
+	if cfg.opts.Start != 50 {
+		t.Errorf("Start: got %d, want %d", cfg.opts.Start, 50)
+	}
 }
 
 func TestParseConfig_EnvFallback(t *testing.T) {
@@ -41,6 +45,7 @@ func TestParseConfig_EnvFallback(t *testing.T) {
 	t.Setenv("WORK_TYPE", "remote")
 	t.Setenv("JOB_TYPE", "F")
 	t.Setenv("NUM_JOBS", "5")
+	t.Setenv("START", "30")
 
 	cfg, err := parseConfig([]string{})
 	if err != nil {
@@ -61,6 +66,9 @@ func TestParseConfig_EnvFallback(t *testing.T) {
 	}
 	if cfg.numJobs != 5 {
 		t.Errorf("numJobs: got %d, want %d", cfg.numJobs, 5)
+	}
+	if cfg.opts.Start != 30 {
+		t.Errorf("Start: got %d, want %d", cfg.opts.Start, 30)
 	}
 }
 
@@ -93,6 +101,25 @@ func TestParseConfig_InvalidNumJobs(t *testing.T) {
 	_, err := parseConfig([]string{})
 	if err == nil {
 		t.Error("expected error for invalid NUM_JOBS, got nil")
+	}
+}
+
+func TestParseConfig_DefaultStart(t *testing.T) {
+	cfg, err := parseConfig([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.opts.Start != 0 {
+		t.Errorf("Start: got %d, want 0", cfg.opts.Start)
+	}
+}
+
+func TestParseConfig_InvalidStart(t *testing.T) {
+	t.Setenv("START", "not-a-number")
+
+	_, err := parseConfig([]string{})
+	if err == nil {
+		t.Error("expected error for invalid START, got nil")
 	}
 }
 
