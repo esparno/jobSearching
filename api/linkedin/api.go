@@ -195,22 +195,25 @@ const (
 
 var (
 	requestCount atomic.Int64
-	delayMu      sync.Mutex
+	delayMu      sync.RWMutex
 )
 
-// randomDelay serialises all outbound requests behind a mutex so they fire
-// one at a time with a random gap. Every macroBreakEvery calls it holds the
-// lock for a longer macro-break, which blocks all workers until it completes.
+// randomDelay applies a per-request random sleep, with periodic macro-breaks that block
+// all concurrent workers. Normal requests acquire a read lock only briefly (as a gate to
+// wait out any active macro-break), then sleep independently so concurrent workers don't
+// serialize. Macro-breaks hold the write lock for the full pause duration.
 func randomDelay() {
 	n := requestCount.Add(1)
-	delayMu.Lock()
-	defer delayMu.Unlock()
 	if n%macroBreakEvery == 0 {
+		delayMu.Lock()
 		pause := macroBreakMin + time.Duration(rand.Int63n(int64(macroBreakMax-macroBreakMin)))
 		log.Printf("macro-break: pausing %s after %d requests", pause.Round(time.Second), n)
 		time.Sleep(pause)
+		delayMu.Unlock()
 		return
 	}
+	delayMu.RLock()
+	delayMu.RUnlock()
 	time.Sleep(minDelay + time.Duration(rand.Int63n(int64(maxJitter))))
 }
 
