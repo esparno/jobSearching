@@ -9,7 +9,11 @@ import (
 
 // UpsertJob inserts a job listing or bumps last_seen if it already exists.
 // Returns the internal job ID, whether the row was newly inserted, and any error.
+// A nil pool is silently ignored.
 func UpsertJob(ctx context.Context, pool *pgxpool.Pool, job models.Job) (int64, bool, error) {
+	if pool == nil {
+		return 0, false, nil
+	}
 	var id int64
 	var isNew bool
 	err := pool.QueryRow(ctx, `
