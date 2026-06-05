@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package search;
+
+option go_package = "search/proto";
+
+service JobSearch {
+  rpc Search(SearchRequest) returns (SearchResponse);
+}
+
+message SearchRequest {
+  repeated string searchTerms            = 1;
+  repeated string title_exclusions = 2;
+}
+
+message SearchResponse {
+  repeated JobResult jobs = 1;
+}
+
+message JobResult {
+  string           title          = 1;
+  string           company        = 2;
+  optional double  pay_min        = 3;
+  optional double  pay_max        = 4;
+  string           pay_type       = 5;
+  int32            dup_count      = 6;
+  optional int32   max_applicants = 7;
+  optional int32   min_applicants = 8;
+  string           first_seen     = 9;
+  string           last_seen      = 10;
+  repeated string  apply_urls     = 11;
+  string           posted_date    = 12;
+}
