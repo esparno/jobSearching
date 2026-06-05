@@ -25,6 +25,7 @@ type SearchRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	SearchTerms     []string               `protobuf:"bytes,1,rep,name=searchTerms,proto3" json:"searchTerms,omitempty"`
 	TitleExclusions []string               `protobuf:"bytes,2,rep,name=title_exclusions,json=titleExclusions,proto3" json:"title_exclusions,omitempty"`
+	ExcludeNullPay  bool                   `protobuf:"varint,3,opt,name=excludeNullPay,proto3" json:"excludeNullPay,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -71,6 +72,13 @@ func (x *SearchRequest) GetTitleExclusions() []string {
 		return x.TitleExclusions
 	}
 	return nil
+}
+
+func (x *SearchRequest) GetExcludeNullPay() bool {
+	if x != nil {
+		return x.ExcludeNullPay
+	}
+	return false
 }
 
 type SearchResponse struct {
@@ -261,10 +269,11 @@ var File_proto_search_proto protoreflect.FileDescriptor
 
 const file_proto_search_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/search.proto\x12\x06search\"\\\n" +
+	"\x12proto/search.proto\x12\x06search\"\x84\x01\n" +
 	"\rSearchRequest\x12 \n" +
 	"\vsearchTerms\x18\x01 \x03(\tR\vsearchTerms\x12)\n" +
-	"\x10title_exclusions\x18\x02 \x03(\tR\x0ftitleExclusions\"7\n" +
+	"\x10title_exclusions\x18\x02 \x03(\tR\x0ftitleExclusions\x12&\n" +
+	"\x0eexcludeNullPay\x18\x03 \x01(\bR\x0eexcludeNullPay\"7\n" +
 	"\x0eSearchResponse\x12%\n" +
 	"\x04jobs\x18\x01 \x03(\v2\x11.search.JobResultR\x04jobs\"\xe3\x03\n" +
 	"\tJobResult\x12\x14\n" +

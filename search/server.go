@@ -42,6 +42,7 @@ WITH deduped AS (
     WHERE ($1 = '' OR j.title !~* $1)
       AND j.company != ALL($2::text[])
       AND jd.description_tsv @@ to_tsquery('simple', $3)
+	  AND ($4 OR jd.pay_text IS NOT NULL)
     GROUP BY j.title, j.company, jd.pay_text
     ORDER BY dup_count DESC
 )
@@ -59,7 +60,7 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 	}
 	titlePattern := buildTitlePattern(req.TitleExclusions)
 
-	rows, err := s.pool.Query(ctx, query, titlePattern, excludedCompanies, tsquery)
+	rows, err := s.pool.Query(ctx, query, titlePattern, excludedCompanies, tsquery, !req.ExcludeNullPay)
 	if err != nil {
 		log.Printf("search query: %v", err)
 		return nil, status.Error(codes.Internal, "search failed")
