@@ -30,4 +30,5 @@ message JobResult {
   string           last_seen      = 10;
   repeated string  apply_urls     = 11;
   string           posted_date    = 12;
+  string           description    = 13;
 }

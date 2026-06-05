@@ -131,6 +131,7 @@ type JobResult struct {
 	LastSeen      string                 `protobuf:"bytes,10,opt,name=last_seen,json=lastSeen,proto3" json:"last_seen,omitempty"`
 	ApplyUrls     []string               `protobuf:"bytes,11,rep,name=apply_urls,json=applyUrls,proto3" json:"apply_urls,omitempty"`
 	PostedDate    string                 `protobuf:"bytes,12,opt,name=posted_date,json=postedDate,proto3" json:"posted_date,omitempty"`
+	Description   string                 `protobuf:"bytes,13,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -249,6 +250,13 @@ func (x *JobResult) GetPostedDate() string {
 	return ""
 }
 
+func (x *JobResult) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 var File_proto_search_proto protoreflect.FileDescriptor
 
 const file_proto_search_proto_rawDesc = "" +
@@ -258,7 +266,7 @@ const file_proto_search_proto_rawDesc = "" +
 	"\vsearchTerms\x18\x01 \x03(\tR\vsearchTerms\x12)\n" +
 	"\x10title_exclusions\x18\x02 \x03(\tR\x0ftitleExclusions\"7\n" +
 	"\x0eSearchResponse\x12%\n" +
-	"\x04jobs\x18\x01 \x03(\v2\x11.search.JobResultR\x04jobs\"\xc1\x03\n" +
+	"\x04jobs\x18\x01 \x03(\v2\x11.search.JobResultR\x04jobs\"\xe3\x03\n" +
 	"\tJobResult\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\x18\n" +
 	"\acompany\x18\x02 \x01(\tR\acompany\x12\x1c\n" +
@@ -275,7 +283,8 @@ const file_proto_search_proto_rawDesc = "" +
 	"\n" +
 	"apply_urls\x18\v \x03(\tR\tapplyUrls\x12\x1f\n" +
 	"\vposted_date\x18\f \x01(\tR\n" +
-	"postedDateB\n" +
+	"postedDate\x12 \n" +
+	"\vdescription\x18\r \x01(\tR\vdescriptionB\n" +
 	"\n" +
 	"\b_pay_minB\n" +
 	"\n" +

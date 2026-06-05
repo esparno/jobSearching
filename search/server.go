@@ -35,7 +35,8 @@ WITH deduped AS (
            min(j.first_seen)            AS first_seen,
            max(j.last_seen)             AS last_seen,
            array_agg(DISTINCT jd.apply_url) AS apply_urls,
-           min(j.posted_date)           AS posted_date
+           min(j.posted_date)           AS posted_date,
+           min(jd.description)           AS description
     FROM jobs j
     JOIN job_details jd ON j.id = jd.job_id
     WHERE ($1 = '' OR j.title !~* $1)
@@ -80,23 +81,26 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 			lastSeen      time.Time
 			applyURLs     []string
 			postedDate    *time.Time
+			description   string
 		)
 		if err := rows.Scan(
 			&title, &company, &payMin, &payMax, &payType,
 			&dupCount, &maxApplicants, &minApplicants,
 			&firstSeen, &lastSeen, &applyURLs, &postedDate,
+			&description,
 		); err != nil {
 			log.Printf("search scan: %v", err)
 			return nil, status.Error(codes.Internal, "search failed")
 		}
 
 		job := &proto.JobResult{
-			Title:     title,
-			Company:   company,
-			DupCount:  dupCount,
-			FirstSeen: firstSeen.Format(time.RFC3339),
-			LastSeen:  lastSeen.Format(time.RFC3339),
-			ApplyUrls: filterNilStrings(applyURLs),
+			Title:       title,
+			Company:     company,
+			DupCount:    dupCount,
+			FirstSeen:   firstSeen.Format(time.RFC3339),
+			LastSeen:    lastSeen.Format(time.RFC3339),
+			ApplyUrls:   filterNilStrings(applyURLs),
+			Description: description,
 		}
 		if payMin != nil {
 			job.PayMin = payMin
