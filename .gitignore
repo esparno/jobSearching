@@ -9,15 +9,12 @@ jobSearching
 # Test binary
 *.test
 
-# Go workspace
-go.work
-go.work.sum
-
 # Dependency cache
 vendor/
 
 # Environment / secrets
-.env.*
+.env.local
+.env.test
 
 # IDE
 .idea/
@@ -26,3 +23,5 @@ vendor/
 
 # Claude
 .claude/
+/.claude/
+/.idea/
