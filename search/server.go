@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"search/proto"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var excludedCompanies = []string{"Jobright.ai", "Jobot", "Joblet-AI", "Ladders"}
@@ -46,18 +49,19 @@ ORDER BY posted_date DESC, pay_max DESC NULLS LAST`
 
 func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
 	if len(req.SearchTerms) == 0 {
-		return nil, fmt.Errorf("at least one search term is required")
+		return nil, status.Error(codes.InvalidArgument, "at least one search term is required")
 	}
 
 	tsquery, err := buildTsquery(req.SearchTerms)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 	titlePattern := buildTitlePattern(req.TitleExclusions)
 
 	rows, err := s.pool.Query(ctx, query, titlePattern, excludedCompanies, tsquery)
 	if err != nil {
-		return nil, fmt.Errorf("query: %w", err)
+		log.Printf("search query: %v", err)
+		return nil, status.Error(codes.Internal, "search failed")
 	}
 	defer rows.Close()
 
@@ -82,7 +86,8 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 			&dupCount, &maxApplicants, &minApplicants,
 			&firstSeen, &lastSeen, &applyURLs, &postedDate,
 		); err != nil {
-			return nil, fmt.Errorf("scan: %w", err)
+			log.Printf("search scan: %v", err)
+			return nil, status.Error(codes.Internal, "search failed")
 		}
 
 		job := &proto.JobResult{
@@ -115,7 +120,8 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 		jobs = append(jobs, job)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows: %w", err)
+		log.Printf("search rows: %v", err)
+		return nil, status.Error(codes.Internal, "search failed")
 	}
 
 	return &proto.SearchResponse{Jobs: jobs}, nil

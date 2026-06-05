@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load(".env.local")
+	_ = godotenv.Load("../.env.local")
 
 	cfg, err := parseConfig(os.Args[1:])
 	if err != nil {

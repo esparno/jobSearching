@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load(".env.local")
+	_ = godotenv.Load("../.env.local")
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
