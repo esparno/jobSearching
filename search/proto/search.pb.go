@@ -22,16 +22,17 @@ const (
 )
 
 type SearchRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	SearchTerms       []string               `protobuf:"bytes,1,rep,name=searchTerms,proto3" json:"searchTerms,omitempty"`
-	TitleExclusions   []string               `protobuf:"bytes,2,rep,name=title_exclusions,json=titleExclusions,proto3" json:"title_exclusions,omitempty"`
-	ExcludeNullPay    bool                   `protobuf:"varint,3,opt,name=excludeNullPay,proto3" json:"excludeNullPay,omitempty"`
-	PayMin            uint32                 `protobuf:"varint,4,opt,name=payMin,proto3" json:"payMin,omitempty"`
-	CompanyExclusions []string               `protobuf:"bytes,5,rep,name=company_exclusions,json=companyExclusions,proto3" json:"company_exclusions,omitempty"`
-	MaxApplicants     uint32                 `protobuf:"varint,6,opt,name=max_applicants,json=maxApplicants,proto3" json:"max_applicants,omitempty"`
-	Days              uint32                 `protobuf:"varint,7,opt,name=days,proto3" json:"days,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	SearchTerms           []string               `protobuf:"bytes,1,rep,name=searchTerms,proto3" json:"searchTerms,omitempty"`
+	TitleExclusions       []string               `protobuf:"bytes,2,rep,name=title_exclusions,json=titleExclusions,proto3" json:"title_exclusions,omitempty"`
+	ExcludeNullPay        bool                   `protobuf:"varint,3,opt,name=excludeNullPay,proto3" json:"excludeNullPay,omitempty"`
+	PayMin                uint32                 `protobuf:"varint,4,opt,name=payMin,proto3" json:"payMin,omitempty"`
+	CompanyExclusions     []string               `protobuf:"bytes,5,rep,name=company_exclusions,json=companyExclusions,proto3" json:"company_exclusions,omitempty"`
+	MaxApplicants         uint32                 `protobuf:"varint,6,opt,name=max_applicants,json=maxApplicants,proto3" json:"max_applicants,omitempty"`
+	Days                  uint32                 `protobuf:"varint,7,opt,name=days,proto3" json:"days,omitempty"`
+	DescriptionExclusions []string               `protobuf:"bytes,8,rep,name=description_exclusions,json=descriptionExclusions,proto3" json:"description_exclusions,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *SearchRequest) Reset() {
@@ -111,6 +112,13 @@ func (x *SearchRequest) GetDays() uint32 {
 		return x.Days
 	}
 	return 0
+}
+
+func (x *SearchRequest) GetDescriptionExclusions() []string {
+	if x != nil {
+		return x.DescriptionExclusions
+	}
+	return nil
 }
 
 type SearchResponse struct {
@@ -301,7 +309,7 @@ var File_proto_search_proto protoreflect.FileDescriptor
 
 const file_proto_search_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/search.proto\x12\x06search\"\x86\x02\n" +
+	"\x12proto/search.proto\x12\x06search\"\xbd\x02\n" +
 	"\rSearchRequest\x12 \n" +
 	"\vsearchTerms\x18\x01 \x03(\tR\vsearchTerms\x12)\n" +
 	"\x10title_exclusions\x18\x02 \x03(\tR\x0ftitleExclusions\x12&\n" +
@@ -309,7 +317,8 @@ const file_proto_search_proto_rawDesc = "" +
 	"\x06payMin\x18\x04 \x01(\rR\x06payMin\x12-\n" +
 	"\x12company_exclusions\x18\x05 \x03(\tR\x11companyExclusions\x12%\n" +
 	"\x0emax_applicants\x18\x06 \x01(\rR\rmaxApplicants\x12\x12\n" +
-	"\x04days\x18\a \x01(\rR\x04days\"7\n" +
+	"\x04days\x18\a \x01(\rR\x04days\x125\n" +
+	"\x16description_exclusions\x18\b \x03(\tR\x15descriptionExclusions\"7\n" +
 	"\x0eSearchResponse\x12%\n" +
 	"\x04jobs\x18\x01 \x03(\v2\x11.search.JobResultR\x04jobs\"\xe3\x03\n" +
 	"\tJobResult\x12\x14\n" +

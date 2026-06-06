@@ -15,7 +15,8 @@ message SearchRequest {
   uint32          payMin             = 4;
   repeated string company_exclusions = 5;
   uint32          max_applicants     = 6;
-  uint32          days               = 7;
+  uint32          days                    = 7;
+  repeated string description_exclusions  = 8;
 }
 
 message SearchResponse {

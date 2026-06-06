@@ -26,6 +26,19 @@ func buildTsquery(terms []string) (string, error) {
 	return strings.Join(parts, " & "), nil
 }
 
+func buildDescriptionExclusions(terms []string) string {
+	nonWord := regexp.MustCompile(`\W+`)
+	parts := make([]string, 0, len(terms))
+	for _, t := range terms {
+		t = strings.TrimSpace(t)
+		t = nonWord.ReplaceAllString(t, "")
+		if t != "" {
+			parts = append(parts, t)
+		}
+	}
+	return strings.Join(parts, " | ")
+}
+
 func buildTitlePattern(exclusions []string) string {
 	if len(exclusions) == 0 {
 		return ""
