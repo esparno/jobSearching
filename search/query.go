@@ -29,6 +29,7 @@ WITH deduped AS (
       AND j.company != ALL($2::text[])
       AND jd.description_tsv @@ to_tsquery('simple', $3)
       AND ($4 OR jd.pay_text IS NOT NULL)
+	  AND (jd.pay_max >= $5 OR jd.pay_min >= $5 OR jd.pay_text IS NULL)
     GROUP BY j.title, j.company, jd.pay_text
     ORDER BY dup_count DESC
 )

@@ -27,7 +27,7 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	jobs, err := s.queryJobs(ctx, buildTitlePattern(req.TitleExclusions), tsquery, !req.ExcludeNullPay)
+	jobs, err := s.queryJobs(ctx, buildTitlePattern(req.TitleExclusions), tsquery, !req.ExcludeNullPay, req.PayMin)
 	if err != nil {
 		return nil, err
 	}
@@ -35,8 +35,8 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 	return &proto.SearchResponse{Jobs: jobs}, nil
 }
 
-func (s *server) queryJobs(ctx context.Context, titlePattern, tsquery string, includeNullPay bool) ([]*proto.JobResult, error) {
-	rows, err := s.pool.Query(ctx, searchQuery, titlePattern, excludedCompanies, tsquery, includeNullPay)
+func (s *server) queryJobs(ctx context.Context, titlePattern, tsquery string, includeNullPay bool, payMin uint32) ([]*proto.JobResult, error) {
+	rows, err := s.pool.Query(ctx, searchQuery, titlePattern, excludedCompanies, tsquery, includeNullPay, payMin)
 	if err != nil {
 		return nil, internalErr("search query: %v", err)
 	}
