@@ -53,6 +53,17 @@ func buildTitlePattern(exclusions []string) string {
 	return strings.Join(escaped, "|")
 }
 
+func sanitizeStrings(ss []string) []string {
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func filterNilStrings(ss []string) []string {
 	out := make([]string, 0, len(ss))
 	for _, s := range ss {

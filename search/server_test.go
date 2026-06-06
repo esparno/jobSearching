@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,6 +49,49 @@ func TestSearch_InvalidNonExactSearchTermsAfterSanitization(t *testing.T) {
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.InvalidArgument {
 		t.Errorf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestSearch_TermTooLong(t *testing.T) {
+	s := testServer(t)
+	long := strings.Repeat("a", maxTermLen+1)
+	_, err := s.Search(context.Background(), &proto.SearchRequest{
+		ExactSearchTerms: []string{long},
+	})
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument for oversized term, got %v", err)
+	}
+}
+
+func TestSearch_TooManyTerms(t *testing.T) {
+	s := testServer(t)
+	terms := make([]string, maxTermCount+1)
+	for i := range terms {
+		terms[i] = "scala"
+	}
+	_, err := s.Search(context.Background(), &proto.SearchRequest{
+		ExactSearchTerms: terms,
+	})
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument for too many terms, got %v", err)
+	}
+}
+
+func TestSearch_TooManyTitleExclusions(t *testing.T) {
+	s := testServer(t)
+	excl := make([]string, maxTitleExclCount+1)
+	for i := range excl {
+		excl[i] = "Senior"
+	}
+	_, err := s.Search(context.Background(), &proto.SearchRequest{
+		ExactSearchTerms: []string{"scala"},
+		TitleExclusions:  excl,
+	})
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument for too many title exclusions, got %v", err)
 	}
 }
 
