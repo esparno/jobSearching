@@ -31,6 +31,7 @@ WITH deduped AS (
       AND ($4 OR jd.pay_text IS NOT NULL)
 	  AND (jd.pay_max >= $5 OR jd.pay_min >= $5 OR jd.pay_text IS NULL)
 	  AND ($6 = 0 OR jd.applicants IS NULL OR jd.applicants <= $6)
+	  AND ($7 = 0 OR j.posted_date >= CURRENT_DATE - ($7::int - 1))
     GROUP BY j.title, j.company, jd.pay_text
     ORDER BY dup_count DESC
 )

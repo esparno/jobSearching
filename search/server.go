@@ -29,7 +29,7 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 
 	companies := append(excludedCompanies, req.CompanyExclusions...)
 
-	jobs, err := s.queryJobs(ctx, buildTitlePattern(req.TitleExclusions), tsquery, !req.ExcludeNullPay, req.PayMin, req.MaxApplicants, companies)
+	jobs, err := s.queryJobs(ctx, buildTitlePattern(req.TitleExclusions), tsquery, !req.ExcludeNullPay, req.PayMin, req.MaxApplicants, req.Days, companies)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +37,8 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 	return &proto.SearchResponse{Jobs: jobs}, nil
 }
 
-func (s *server) queryJobs(ctx context.Context, titlePattern, tsquery string, includeNullPay bool, payMin, maxApplicants uint32, companies []string) ([]*proto.JobResult, error) {
-	rows, err := s.pool.Query(ctx, searchQuery, titlePattern, companies, tsquery, includeNullPay, payMin, maxApplicants)
+func (s *server) queryJobs(ctx context.Context, titlePattern, tsquery string, includeNullPay bool, payMin, maxApplicants, days uint32, companies []string) ([]*proto.JobResult, error) {
+	rows, err := s.pool.Query(ctx, searchQuery, titlePattern, companies, tsquery, includeNullPay, payMin, maxApplicants, days)
 	if err != nil {
 		return nil, internalErr("search query: %v", err)
 	}
