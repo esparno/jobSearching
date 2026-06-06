@@ -20,19 +20,20 @@ WITH deduped AS (
            min(jd.applicants)           AS min_applicants,
            min(j.first_seen)            AS first_seen,
            max(j.last_seen)             AS last_seen,
-           array_agg(DISTINCT jd.apply_url) AS apply_urls,
+           array_agg(DISTINCT jd.apply_url) FILTER (WHERE jd.apply_url IS NOT NULL) AS apply_urls,
            min(j.posted_date)           AS posted_date,
            min(jd.description)          AS description
     FROM jobs j
     JOIN job_details jd ON j.id = jd.job_id
     WHERE ($1 = '' OR j.title !~* $1)
       AND j.company != ALL($2::text[])
-      AND jd.description_tsv @@ to_tsquery('simple', $3)
+      AND ($3 = '' OR jd.description_tsv @@ to_tsquery('simple', $3))
+      AND ($9 = '' OR jd.description_tsv @@ to_tsquery('english', $9))
       AND ($4 OR jd.pay_text IS NOT NULL)
-	  AND (jd.pay_max >= $5 OR jd.pay_min >= $5 OR jd.pay_text IS NULL)
+	  AND ($5 = 0 OR jd.pay_max >= $5 OR jd.pay_min >= $5 OR jd.pay_text IS NULL)
 	  AND ($6 = 0 OR jd.applicants IS NULL OR jd.applicants <= $6)
 	  AND ($7 = 0 OR j.posted_date >= CURRENT_DATE - ($7::int - 1))
-	  AND ($8 = '' OR NOT (jd.description_tsv @@ to_tsquery('simple', $8)))
+	  AND ($8 = '' OR NOT (jd.description_tsv @@ to_tsquery('english', $8)))
     GROUP BY j.title, j.company, jd.pay_text
     ORDER BY dup_count DESC
 )

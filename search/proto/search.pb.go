@@ -23,7 +23,7 @@ const (
 
 type SearchRequest struct {
 	state                 protoimpl.MessageState `protogen:"open.v1"`
-	SearchTerms           []string               `protobuf:"bytes,1,rep,name=searchTerms,proto3" json:"searchTerms,omitempty"`
+	ExactSearchTerms      []string               `protobuf:"bytes,1,rep,name=exactSearchTerms,proto3" json:"exactSearchTerms,omitempty"`
 	TitleExclusions       []string               `protobuf:"bytes,2,rep,name=title_exclusions,json=titleExclusions,proto3" json:"title_exclusions,omitempty"`
 	ExcludeNullPay        bool                   `protobuf:"varint,3,opt,name=excludeNullPay,proto3" json:"excludeNullPay,omitempty"`
 	PayMin                uint32                 `protobuf:"varint,4,opt,name=payMin,proto3" json:"payMin,omitempty"`
@@ -31,6 +31,7 @@ type SearchRequest struct {
 	MaxApplicants         uint32                 `protobuf:"varint,6,opt,name=max_applicants,json=maxApplicants,proto3" json:"max_applicants,omitempty"`
 	Days                  uint32                 `protobuf:"varint,7,opt,name=days,proto3" json:"days,omitempty"`
 	DescriptionExclusions []string               `protobuf:"bytes,8,rep,name=description_exclusions,json=descriptionExclusions,proto3" json:"description_exclusions,omitempty"`
+	NonExactSearchTerms   []string               `protobuf:"bytes,9,rep,name=nonExactSearchTerms,proto3" json:"nonExactSearchTerms,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -65,9 +66,9 @@ func (*SearchRequest) Descriptor() ([]byte, []int) {
 	return file_proto_search_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SearchRequest) GetSearchTerms() []string {
+func (x *SearchRequest) GetExactSearchTerms() []string {
 	if x != nil {
-		return x.SearchTerms
+		return x.ExactSearchTerms
 	}
 	return nil
 }
@@ -117,6 +118,13 @@ func (x *SearchRequest) GetDays() uint32 {
 func (x *SearchRequest) GetDescriptionExclusions() []string {
 	if x != nil {
 		return x.DescriptionExclusions
+	}
+	return nil
+}
+
+func (x *SearchRequest) GetNonExactSearchTerms() []string {
+	if x != nil {
+		return x.NonExactSearchTerms
 	}
 	return nil
 }
@@ -309,16 +317,17 @@ var File_proto_search_proto protoreflect.FileDescriptor
 
 const file_proto_search_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/search.proto\x12\x06search\"\xbd\x02\n" +
-	"\rSearchRequest\x12 \n" +
-	"\vsearchTerms\x18\x01 \x03(\tR\vsearchTerms\x12)\n" +
+	"\x12proto/search.proto\x12\x06search\"\xf9\x02\n" +
+	"\rSearchRequest\x12*\n" +
+	"\x10exactSearchTerms\x18\x01 \x03(\tR\x10exactSearchTerms\x12)\n" +
 	"\x10title_exclusions\x18\x02 \x03(\tR\x0ftitleExclusions\x12&\n" +
 	"\x0eexcludeNullPay\x18\x03 \x01(\bR\x0eexcludeNullPay\x12\x16\n" +
 	"\x06payMin\x18\x04 \x01(\rR\x06payMin\x12-\n" +
 	"\x12company_exclusions\x18\x05 \x03(\tR\x11companyExclusions\x12%\n" +
 	"\x0emax_applicants\x18\x06 \x01(\rR\rmaxApplicants\x12\x12\n" +
 	"\x04days\x18\a \x01(\rR\x04days\x125\n" +
-	"\x16description_exclusions\x18\b \x03(\tR\x15descriptionExclusions\"7\n" +
+	"\x16description_exclusions\x18\b \x03(\tR\x15descriptionExclusions\x120\n" +
+	"\x13nonExactSearchTerms\x18\t \x03(\tR\x13nonExactSearchTerms\"7\n" +
 	"\x0eSearchResponse\x12%\n" +
 	"\x04jobs\x18\x01 \x03(\v2\x11.search.JobResultR\x04jobs\"\xe3\x03\n" +
 	"\tJobResult\x12\x14\n" +

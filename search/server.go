@@ -18,18 +18,31 @@ type server struct {
 }
 
 func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
-	if len(req.SearchTerms) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "at least one search term is required")
+	if len(req.ExactSearchTerms) == 0 && len(req.NonExactSearchTerms) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "at least one of exactTerms or nonExactTerms is required")
 	}
 
-	tsquery, err := buildTsquery(req.SearchTerms)
-	if err != nil {
+	exactTsquery, err := buildTsquery(req.ExactSearchTerms)
+	if err != nil && len(req.ExactSearchTerms) > 0 {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	nonExactTsquery, err := buildTsquery(req.NonExactSearchTerms)
+	if err != nil && len(req.NonExactSearchTerms) > 0 {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	companies := append(excludedCompanies, req.CompanyExclusions...)
 
-	jobs, err := s.queryJobs(ctx, buildTitlePattern(req.TitleExclusions), tsquery, buildDescriptionExclusions(req.DescriptionExclusions), !req.ExcludeNullPay, req.PayMin, req.MaxApplicants, req.Days, companies)
+	jobs, err := s.queryJobs(ctx,
+		buildTitlePattern(req.TitleExclusions),
+		exactTsquery,
+		nonExactTsquery,
+		buildDescriptionExclusions(req.DescriptionExclusions),
+		!req.ExcludeNullPay,
+		req.PayMin, req.MaxApplicants, req.Days,
+		companies,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -37,8 +50,11 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 	return &proto.SearchResponse{Jobs: jobs}, nil
 }
 
-func (s *server) queryJobs(ctx context.Context, titlePattern, tsquery, descExclusions string, includeNullPay bool, payMin, maxApplicants, days uint32, companies []string) ([]*proto.JobResult, error) {
-	rows, err := s.pool.Query(ctx, searchQuery, titlePattern, companies, tsquery, includeNullPay, payMin, maxApplicants, days, descExclusions)
+func (s *server) queryJobs(ctx context.Context, titlePattern, exactTsquery, nonExactTsquery, descExclusions string, includeNullPay bool, payMin, maxApplicants, days uint32, companies []string) ([]*proto.JobResult, error) {
+	rows, err := s.pool.Query(ctx, searchQuery,
+		titlePattern, companies, exactTsquery, includeNullPay,
+		payMin, maxApplicants, days, descExclusions, nonExactTsquery,
+	)
 	if err != nil {
 		return nil, internalErr("search query: %v", err)
 	}

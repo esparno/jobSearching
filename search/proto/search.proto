@@ -9,14 +9,15 @@ service JobSearch {
 }
 
 message SearchRequest {
-  repeated string searchTerms = 1;
-  repeated string title_exclusions = 2;
-  bool            excludeNullPay     = 3;
-  uint32          payMin             = 4;
-  repeated string company_exclusions = 5;
-  uint32          max_applicants     = 6;
+  repeated string exactSearchTerms              = 1;
+  repeated string title_exclusions        = 2;
+  bool            excludeNullPay          = 3;
+  uint32          payMin                  = 4;
+  repeated string company_exclusions      = 5;
+  uint32          max_applicants          = 6;
   uint32          days                    = 7;
   repeated string description_exclusions  = 8;
+  repeated string nonExactSearchTerms           = 9;
 }
 
 message SearchResponse {
