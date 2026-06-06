@@ -2,12 +2,20 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"search/proto"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+)
+
+const (
+	maxTermLen        = 75
+	maxTermCount      = 20
+	maxTitleExclCount = 150
 )
 
 var excludedCompanies = []string{"Jobright.ai", "Jobot", "Joblet-AI", "Ladders"}
@@ -17,9 +25,37 @@ type server struct {
 	pool *pgxpool.Pool
 }
 
+func validateTerms(terms []string, field string, maxCount int) error {
+	if len(terms) > maxCount {
+		return fmt.Errorf("%s: too many terms (max %d)", field, maxCount)
+	}
+	for _, t := range terms {
+		if len(strings.TrimSpace(t)) > maxTermLen {
+			return fmt.Errorf("%s: term exceeds max length of %d characters", field, maxTermLen)
+		}
+	}
+	return nil
+}
+
 func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
 	if len(req.ExactSearchTerms) == 0 && len(req.NonExactSearchTerms) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "at least one of exactTerms or nonExactTerms is required")
+	}
+
+	for _, check := range []struct {
+		terms    []string
+		field    string
+		maxCount int
+	}{
+		{req.ExactSearchTerms, "exactSearchTerms", maxTermCount},
+		{req.NonExactSearchTerms, "nonExactSearchTerms", maxTermCount},
+		{req.DescriptionExclusions, "descriptionExclusions", maxTermCount},
+		{req.CompanyExclusions, "companyExclusions", maxTermCount},
+		{req.TitleExclusions, "titleExclusions", maxTitleExclCount},
+	} {
+		if err := validateTerms(check.terms, check.field, check.maxCount); err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 	}
 
 	exactTsquery, err := buildTsquery(req.ExactSearchTerms)
@@ -32,7 +68,7 @@ func (s *server) Search(ctx context.Context, req *proto.SearchRequest) (*proto.S
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	companies := append(excludedCompanies, req.CompanyExclusions...)
+	companies := append(excludedCompanies, sanitizeStrings(req.CompanyExclusions)...)
 
 	jobs, err := s.queryJobs(ctx,
 		buildTitlePattern(req.TitleExclusions),
