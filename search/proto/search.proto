@@ -11,8 +11,9 @@ service JobSearch {
 message SearchRequest {
   repeated string searchTerms = 1;
   repeated string title_exclusions = 2;
-  bool            excludeNullPay = 3;
-  uint32          payMin = 4;
+  bool            excludeNullPay     = 3;
+  uint32          payMin             = 4;
+  repeated string company_exclusions = 5;
 }
 
 message SearchResponse {

@@ -22,13 +22,14 @@ const (
 )
 
 type SearchRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	SearchTerms     []string               `protobuf:"bytes,1,rep,name=searchTerms,proto3" json:"searchTerms,omitempty"`
-	TitleExclusions []string               `protobuf:"bytes,2,rep,name=title_exclusions,json=titleExclusions,proto3" json:"title_exclusions,omitempty"`
-	ExcludeNullPay  bool                   `protobuf:"varint,3,opt,name=excludeNullPay,proto3" json:"excludeNullPay,omitempty"`
-	PayMin          uint32                 `protobuf:"varint,4,opt,name=payMin,proto3" json:"payMin,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	SearchTerms       []string               `protobuf:"bytes,1,rep,name=searchTerms,proto3" json:"searchTerms,omitempty"`
+	TitleExclusions   []string               `protobuf:"bytes,2,rep,name=title_exclusions,json=titleExclusions,proto3" json:"title_exclusions,omitempty"`
+	ExcludeNullPay    bool                   `protobuf:"varint,3,opt,name=excludeNullPay,proto3" json:"excludeNullPay,omitempty"`
+	PayMin            uint32                 `protobuf:"varint,4,opt,name=payMin,proto3" json:"payMin,omitempty"`
+	CompanyExclusions []string               `protobuf:"bytes,5,rep,name=company_exclusions,json=companyExclusions,proto3" json:"company_exclusions,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SearchRequest) Reset() {
@@ -87,6 +88,13 @@ func (x *SearchRequest) GetPayMin() uint32 {
 		return x.PayMin
 	}
 	return 0
+}
+
+func (x *SearchRequest) GetCompanyExclusions() []string {
+	if x != nil {
+		return x.CompanyExclusions
+	}
+	return nil
 }
 
 type SearchResponse struct {
@@ -277,12 +285,13 @@ var File_proto_search_proto protoreflect.FileDescriptor
 
 const file_proto_search_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/search.proto\x12\x06search\"\x9c\x01\n" +
+	"\x12proto/search.proto\x12\x06search\"\xcb\x01\n" +
 	"\rSearchRequest\x12 \n" +
 	"\vsearchTerms\x18\x01 \x03(\tR\vsearchTerms\x12)\n" +
 	"\x10title_exclusions\x18\x02 \x03(\tR\x0ftitleExclusions\x12&\n" +
 	"\x0eexcludeNullPay\x18\x03 \x01(\bR\x0eexcludeNullPay\x12\x16\n" +
-	"\x06payMin\x18\x04 \x01(\rR\x06payMin\"7\n" +
+	"\x06payMin\x18\x04 \x01(\rR\x06payMin\x12-\n" +
+	"\x12company_exclusions\x18\x05 \x03(\tR\x11companyExclusions\"7\n" +
 	"\x0eSearchResponse\x12%\n" +
 	"\x04jobs\x18\x01 \x03(\v2\x11.search.JobResultR\x04jobs\"\xe3\x03\n" +
 	"\tJobResult\x12\x14\n" +
